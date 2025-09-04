@@ -129,4 +129,12 @@ from decouple import config
 
 FB_APP_ID = config("FB_APP_ID")
 FB_APP_SECRET = config("FB_APP_SECRET")
-BASE_URL = config("BASE_URL")
+
+BASE_URL = "http://localhost:8000"       # Django backend URL
+FRONTEND_URL = "http://localhost:3000"   # React frontend URL
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # your React frontend
+]
+

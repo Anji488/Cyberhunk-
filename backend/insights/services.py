@@ -1,120 +1,150 @@
-import nltk
-from nltk.sentiment import SentimentIntensityAnalyzer
-from googletrans import Translator
-from joblib import load
-import emoji
+# File: services.py
 import re
+import requests
+from langdetect import detect
+from textblob import TextBlob
+from googletrans import Translator
 
-nltk.download('vader_lexicon')
-
-sia = SentimentIntensityAnalyzer()
+# Initialize translator once
 translator = Translator()
 
-# Load ML model if available
-try:
-    model = load('../ml_modals/sentiment_model.pkl')
-    use_ml_model = True
-except:
-    model = None
-    use_ml_model = False
+# ✅ Default max posts
+DEFAULT_MAX_POSTS = 20
+MAX_THREADS = 10
 
-# Emoji sentiment mapping
-EMOJI_SENTIMENT = {
-    "😀": "positive", "😃": "positive", "😄": "positive", "😁": "positive",
-    "😆": "positive", "😊": "positive", "🙂": "positive", "😍": "positive",
-    "🤩": "positive", "😂": "positive", "🤣": "positive", "🥰": "positive",
-    "😎": "positive",
-    "😢": "negative", "😞": "negative", "😠": "negative", "😡": "negative",
-    "😔": "negative", "😭": "negative", "😖": "negative", "😣": "negative",
-    "😐": "neutral", "😶": "neutral",
-}
 
-def translate_text(text):
+# =========================
+# 📌 Facebook Graph Helpers
+# =========================
+def safe_request(url):
+    """Safely fetch JSON from a URL (Facebook Graph)."""
     try:
-        translated = translator.translate(text, src='si', dest='en')
-        return translated.text
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        print("Request error:", e)
+    return {}
+
+
+def fetch_profile(token):
+    """Fetch basic Facebook profile info."""
+    url = f"https://graph.facebook.com/me?fields=id,name,birthday,gender,picture.width(150).height(150)&access_token={token}"
+    return safe_request(url)
+
+
+def fetch_comments(post_id, token, limit=5):
+    """Fetch top-level comments of a post."""
+    url = f"https://graph.facebook.com/v19.0/{post_id}/comments?fields=message,created_time,from,id&limit={limit}&access_token={token}"
+    data = safe_request(url)
+    return data.get("data", [])
+
+
+def fetch_nested_comments(comment, token):
+    """Fetch replies of a given comment."""
+    comment_id = comment.get("id")
+    if not comment_id:
+        return []
+    url = f"https://graph.facebook.com/v19.0/{comment_id}/comments?fields=message,created_time,from,id&limit=5&access_token={token}"
+    data = safe_request(url)
+    return data.get("data", [])
+
+
+# =========================
+# 📌 NLP Analysis Functions
+# =========================
+def analyze_text(text, method="nltk"):
+    """
+    Analyze text sentiment using either NLTK (TextBlob) or ML model.
+    Returns {original, translated, label}.
+    """
+    if not text:
+        return {"original": "", "translated": "", "label": "neutral"}
+
+    original_text = text.strip()
+
+    # Detect language & translate if needed
+    try:
+        lang = detect(original_text)
     except:
-        return text
+        lang = "en"
 
-def extract_emojis(text):
-    return [char for char in text if char in emoji.EMOJI_DATA]
-
-def analyze_text(text, method='nltk'):
-    if not text or not text.strip():
-        return {
-            "original": "",
-            "translated": "",
-            "label": "neutral",
-            "emojis": [],
-            "emoji_sentiments": []
-        }
-
-    translated = translate_text(text)
-
-    # Text sentiment
-    if method == 'ml' and use_ml_model:
+    translated_text = original_text
+    if lang != "en":
         try:
-            label = model.predict([translated])[0]
+            translated_text = translator.translate(original_text, dest="en").text
+        except:
+            translated_text = original_text
+
+    label = "neutral"
+
+    if method == "nltk":
+        try:
+            polarity = TextBlob(translated_text).sentiment.polarity
+            if polarity > 0.1:
+                label = "positive"
+            elif polarity < -0.1:
+                label = "negative"
         except:
             label = "neutral"
-        score = None
-    else:
-        score = sia.polarity_scores(translated)
-        label = 'positive' if score['compound'] > 0.2 else 'negative' if score['compound'] < -0.2 else 'neutral'
 
-    # Emoji sentiment
-    emojis = extract_emojis(text)
-    emoji_labels = [EMOJI_SENTIMENT.get(e, "neutral") for e in emojis]
-
-    # Combine text and emoji sentiment
-    pos_count = emoji_labels.count("positive")
-    neg_count = emoji_labels.count("negative")
-
-    if pos_count > neg_count:
-        if label == "negative":
+    elif method == "ml":
+        # Placeholder for ML model integration
+        try:
+            polarity = TextBlob(translated_text).sentiment.polarity
+            if polarity > 0.2:
+                label = "positive"
+            elif polarity < -0.2:
+                label = "negative"
+        except:
             label = "neutral"
-        else:
-            label = "positive"
-    elif neg_count > pos_count:
-        if label == "positive":
-            label = "neutral"
-        else:
-            label = "negative"
 
-    result = {
-        "original": text,
-        "translated": translated,
-        "label": label,
-        "emojis": emojis,
-        "emoji_sentiments": emoji_labels
-    }
+    return {"original": original_text, "translated": translated_text, "label": label}
 
-    if score:
-        result["score"] = score
 
-    return result
-
+# =========================
+# 📌 Extra Analysis Features
+# =========================
 def is_respectful(text):
-    rude_keywords = ['idiot', 'stupid', 'dumb', 'hate', 'ugly', 'fool', 'nonsense']
-    return not any(word in text.lower() for word in rude_keywords)
+    """Check if text is respectful (very simple keyword-based)."""
+    disrespect_words = ["stupid", "idiot", "dumb", "hate", "kill"]
+    if not text:
+        return True
+    lowered = text.lower()
+    return not any(word in lowered for word in disrespect_words)
+
 
 def mentions_location(text):
-    location_keywords = ['colombo', 'kandy', 'galle', 'address', 'home', 'my place', 'city']
-    return any(loc in text.lower() for loc in location_keywords)
+    """Check if text mentions a location-like word."""
+    if not text:
+        return False
+    patterns = ["colombo", "new york", "paris", "sri lanka", "street", "road", "city"]
+    lowered = text.lower()
+    return any(word in lowered for word in patterns)
+
 
 def discloses_personal_info(text):
-    patterns = [
-        r"\b\d{10}\b",
-        r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,}",
-        r"\b\d{1,4}\s\w+(\s\w+){0,3}",
-        r"(colombo|kandy|galle|my place|home|address|city)"
-    ]
-    return any(re.search(p, text, re.IGNORECASE) for p in patterns)
+    """Detect if text discloses personal info (phone/email)."""
+    if not text:
+        return False
+    email_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
+    phone_pattern = r"\b\d{10}\b"
+    return bool(re.search(email_pattern, text) or re.search(phone_pattern, text))
 
-TOXIC_KEYWORDS = ['idiot', 'stupid', 'hate', 'fool', 'nonsense', 'loser', 'dumb', 'kill']
+
 def is_toxic(text):
-    return any(word in text.lower() for word in TOXIC_KEYWORDS)
+    """Check if text contains toxic words."""
+    toxic_words = ["hate", "kill", "trash", "fuck", "bitch", "shit"]
+    if not text:
+        return False
+    lowered = text.lower()
+    return any(word in lowered for word in toxic_words)
 
-MISINFO_KEYWORDS = ['breaking', 'shocking', 'miracle', 'you won’t believe', 'secret', 'cure']
+
 def is_potential_misinformation(text):
-    return any(word in text.lower() for word in MISINFO_KEYWORDS)
+    """Naive misinformation detection (keywords)."""
+    if not text:
+        return False
+    misinfo_patterns = ["flat earth", "fake news", "miracle cure", "hoax", "5g causes covid"]
+    lowered = text.lower()
+    return any(phrase in lowered for phrase in misinfo_patterns)
