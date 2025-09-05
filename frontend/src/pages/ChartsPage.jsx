@@ -16,7 +16,7 @@ import {
 import { motion } from "framer-motion";
 import { useInsights } from "@/context/InsightsContext";
 
-// ✅ Register all required chart.js elements
+// Register all required chart.js elements
 ChartJS.register(
   CategoryScale,
   LinearScale,

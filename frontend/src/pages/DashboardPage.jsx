@@ -12,7 +12,7 @@ export default function DashboardPage() {
   const { insights, totalPosts, totalComments, profile } = insightsData;
   const total = insights.length || 1;
 
-  // ✅ Only fetch if no insights yet
+  // Only fetch if no insights yet
   const token = Cookies.get("fb_token");
 
   // --- Metrics calculation ---

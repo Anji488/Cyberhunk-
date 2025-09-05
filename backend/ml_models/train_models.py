@@ -6,10 +6,10 @@ from sklearn.pipeline import make_pipeline
 import joblib
 import os
 
-# Folder where your CSVs are located
+# Folder where CSVs are located
 data_folder = os.path.join(os.path.dirname(__file__))
 
-# List of CSV files you want to train models on
+# List of CSV files to train models on
 csv_files = [
     'misinfromations.csv',
     'toxic.csv',

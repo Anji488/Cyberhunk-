@@ -103,7 +103,7 @@ def analyze_text(text, method="nltk"):
 
 
 # =========================
-# 📌 Extra Analysis Features
+#  Extra Analysis Features
 # =========================
 def is_respectful(text):
     """Check if text is respectful (very simple keyword-based)."""

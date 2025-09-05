@@ -20,7 +20,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
     const fetchData = async () => {
       setLoading(true);
       try {
-        // 1️⃣ Check if cached data exists
+        // Check if cached data exists
         const cachedData = Cookies.get("fb_insights");
         if (cachedData) {
           const parsed = JSON.parse(cachedData);
@@ -31,13 +31,13 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
           return; // already loaded from cache
         }
 
-        // 2️⃣ Fetch profile from FB Graph
+        //  Fetch profile from FB Graph
         const profileRes = await axios.get(
           `https://graph.facebook.com/me?fields=id,name,birthday,gender,picture.width(150).height(150)&access_token=${token}`
         );
         setProfile(profileRes.data);
 
-        // 3️⃣ Fetch insights from backend
+        //  Fetch insights from backend
         const res = await axios.get(
           `http://localhost:8000/insights/analyze/?token=${token}&method=${method}`,
           { withCredentials: true }
@@ -56,7 +56,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
           totalComments,
         };
 
-        // 4️⃣ Save to cookies for smooth reload
+        //  Save to cookies for smooth reload
         Cookies.set("fb_insights", JSON.stringify(finalData), { expires: 1 }); // 1 day
 
         if (onInsightsFetched) onInsightsFetched(finalData);
