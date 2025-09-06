@@ -14,7 +14,7 @@ MAX_THREADS = 10
 
 
 # =========================
-# 📌 Facebook Graph Helpers
+#  Facebook Graph Helpers
 # =========================
 def safe_request(url):
     """Safely fetch JSON from a URL (Facebook Graph)."""
@@ -107,7 +107,10 @@ def analyze_text(text, method="nltk"):
 # =========================
 def is_respectful(text):
     """Check if text is respectful (very simple keyword-based)."""
-    disrespect_words = ["stupid", "idiot", "dumb", "hate", "kill"]
+    disrespect_words = [
+        "stupid", "idiot", "dumb", "hate", "kill", "moron", "fool", "loser", "ignorant", "jerk",
+        "worthless", "pathetic", "disgusting", "annoying", "clown", "trash", "nonsense", "shut up"
+    ]
     if not text:
         return True
     lowered = text.lower()
@@ -118,7 +121,11 @@ def mentions_location(text):
     """Check if text mentions a location-like word."""
     if not text:
         return False
-    patterns = ["colombo", "new york", "paris", "sri lanka", "street", "road", "city"]
+    patterns = [
+        "colombo", "new york", "paris", "sri lanka", "street", "road", "city", "village", "country",
+        "state", "avenue", "lane", "district", "province", "capital", "region", "area", "neighborhood",
+        "building", "apartment", "block", "zip code", "postal code", "address"
+    ]
     lowered = text.lower()
     return any(word in lowered for word in patterns)
 
@@ -128,13 +135,20 @@ def discloses_personal_info(text):
     if not text:
         return False
     email_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
-    phone_pattern = r"\b\d{10}\b"
-    return bool(re.search(email_pattern, text) or re.search(phone_pattern, text))
+    phone_patterns = [
+        r"\b\d{10}\b", r"\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b", r"\b\(\d{3}\)[-.\s]?\d{3}[-.\s]?\d{4}\b"
+    ]
+    found_phone = any(re.search(p, text) for p in phone_patterns)
+    return bool(re.search(email_pattern, text) or found_phone)
 
 
 def is_toxic(text):
     """Check if text contains toxic words."""
-    toxic_words = ["hate", "kill", "trash", "fuck", "bitch", "shit"]
+    toxic_words = [
+        "hate", "kill", "trash", "fuck", "bitch", "shit", "idiot", "dumb", "moron", "stupid", "loser",
+        "worthless", "pathetic", "disgusting", "annoying", "clown", "nonsense", "shut up", "suck", "ugly",
+        "creep", "freak", "jerk", "ignorant"
+    ]
     if not text:
         return False
     lowered = text.lower()
@@ -145,6 +159,11 @@ def is_potential_misinformation(text):
     """Naive misinformation detection (keywords)."""
     if not text:
         return False
-    misinfo_patterns = ["flat earth", "fake news", "miracle cure", "hoax", "5g causes covid"]
+    misinfo_patterns = [
+        "flat earth", "fake news", "miracle cure", "hoax", "5g causes covid", "chemtrails", "vaccines cause autism",
+        "moon landing was faked", "climate change is a hoax", "covid is a hoax", "microchip in vaccine",
+        "government cover up", "aliens built pyramids", "secret society", "illuminati", "deep state",
+        "crisis actor", "false flag", "qanon", "lizard people"
+    ]
     lowered = text.lower()
     return any(phrase in lowered for phrase in misinfo_patterns)
