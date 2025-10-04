@@ -1,9 +1,9 @@
-// File: src/App.jsx
 import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Cookies from "js-cookie";
 
 import Login from "@/pages/Login";
+import Home from "@/pages/Home";
 import DashboardPage from "@/pages/DashboardPage";
 import ChartsPage from "@/pages/ChartsPage";
 import PostsPage from "@/pages/PostsPage";
@@ -12,7 +12,15 @@ import Layout from "@/components/Layout";
 import AuthCallback from "@/pages/AuthCallback";
 import { InsightsProvider } from "@/context/InsightsContext";
 
-// ✅ Loading screen
+
+import About from "@/pages/About";
+import Features from "@/pages/Features";
+import Framework from "@/pages/OurFramework";
+import PrivacyPolicy from "@/pages/Privacy";
+import Terms from "@/pages/Terms";
+// import Contact from "@/pages/Contact";
+// import Articles from "@/pages/Articles";
+
 function LoadingScreen() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-950 text-gray-200">
@@ -22,16 +30,13 @@ function LoadingScreen() {
   );
 }
 
-// ✅ ProtectedRoute
 function ProtectedRoute({ children }) {
   const [loading, setLoading] = useState(true);
   const [isAuthed, setIsAuthed] = useState(false);
 
   useEffect(() => {
     const token = Cookies.get("fb_token");
-    if (token) {
-      setIsAuthed(true);
-    }
+    if (token) setIsAuthed(true);
     setLoading(false);
   }, []);
 
@@ -45,19 +50,24 @@ export default function App() {
     <Router>
       <InsightsProvider>
         <Routes>
-          {/* Public */}
-          <Route path="/" element={<Login />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/" element={<Layout><Home /></Layout>} />
+          <Route path="/login" element={<Layout><Login /></Layout>} />
+          <Route path="/auth/callback" element={<Layout><AuthCallback /></Layout>} />
+          <Route path="/about" element={<Layout><About /></Layout>} />
+          <Route path="/features" element={<Layout><Features /></Layout>} />
+          <Route path="/our-framework" element={<Layout><Framework /></Layout>} />
+          <Route path="/terms" element={<Layout><Terms /></Layout>} />
+          <Route path="/privacy-policy" element={<Layout><PrivacyPolicy /></Layout>} />
+          {/*<Route path="/contact" element={<Layout><Contact /></Layout>} />
+          <Route path="/articles" element={<Layout><Articles /></Layout>} />
+           */}
+          
 
-          {/* Protected */}
           <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <Layout>
-                  <DashboardPage />
-                </Layout>
+                <Layout><DashboardPage /></Layout>
               </ProtectedRoute>
             }
           />
@@ -65,9 +75,7 @@ export default function App() {
             path="/charts"
             element={
               <ProtectedRoute>
-                <Layout>
-                  <ChartsPage />
-                </Layout>
+                <Layout><ChartsPage /></Layout>
               </ProtectedRoute>
             }
           />
@@ -75,14 +83,11 @@ export default function App() {
             path="/posts"
             element={
               <ProtectedRoute>
-                <Layout>
-                  <PostsPage />
-                </Layout>
+                <Layout><PostsPage /></Layout>
               </ProtectedRoute>
             }
           />
 
-          {/* Fallback */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </InsightsProvider>

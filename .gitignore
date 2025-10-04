@@ -152,3 +152,11 @@ vite.config.ts.timestamp-*
 venv/
 ENV/
 env/
+/backend/ml_models/models/sentiment/checkpoint-11346
+/backend/ml_models/models/sentiment/model.safetensors
+backend/ml_models/models/sentiment/model.safetensors
+backend/ml_models/models/sentiment/safetensors.zip
+
+backend/ml_models/models/sentiment/*.safetensors
+backend/ml_models/models/sentiment/*.zip
+backend/ml_models/models/sentiment/checkpoint-*

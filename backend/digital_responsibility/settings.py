@@ -135,6 +135,6 @@ FRONTEND_URL = "http://localhost:3000"   # React frontend URL
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # your React frontend
+    "http://localhost:3000",  # React frontend
 ]
 

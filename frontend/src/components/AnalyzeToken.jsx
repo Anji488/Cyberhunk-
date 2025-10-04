@@ -1,4 +1,3 @@
-// File: src/components/AnalyzeToken.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Cookies from "js-cookie";
@@ -20,7 +19,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Check if cached data exists
+        // 1️⃣ Check if cached data exists
         const cachedData = Cookies.get("fb_insights");
         if (cachedData) {
           const parsed = JSON.parse(cachedData);
@@ -31,32 +30,29 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
           return; // already loaded from cache
         }
 
-        //  Fetch profile from FB Graph
-        const profileRes = await axios.get(
-          `https://graph.facebook.com/me?fields=id,name,birthday,gender,picture.width(150).height(150)&access_token=${token}`
-        );
-        setProfile(profileRes.data);
-
-        //  Fetch insights from backend
+        // 2️⃣ Fetch insights from backend (includes profile, metrics, recommendations)
         const res = await axios.get(
           `http://localhost:8000/insights/analyze/?token=${token}&method=${method}`,
           { withCredentials: true }
         );
 
-        const fetchedInsights = res.data.insights || [];
-        setInsights(fetchedInsights);
+        const { profile: profileData, insights: fetchedInsights } = res.data;
+        setProfile(profileData);
+        setInsights(fetchedInsights || []);
 
+        // Prepare data for caching
         const totalPosts = fetchedInsights.filter(i => i.type === "post").length;
         const totalComments = fetchedInsights.filter(i => i.type === "comment").length;
 
         const finalData = {
-          profile: profileRes.data,
+          profile: profileData,
           insights: fetchedInsights,
           totalPosts,
           totalComments,
+          insightMetrics: res.data.insightMetrics || [],
+          recommendations: res.data.recommendations || []
         };
 
-        //  Save to cookies for smooth reload
         Cookies.set("fb_insights", JSON.stringify(finalData), { expires: 1 }); // 1 day
 
         if (onInsightsFetched) onInsightsFetched(finalData);

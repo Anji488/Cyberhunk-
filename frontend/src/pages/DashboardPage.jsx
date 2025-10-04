@@ -1,4 +1,3 @@
-// File: src/pages/DashboardPage.jsx
 import React from "react";
 import { motion } from "framer-motion";
 import Cookies from "js-cookie";
@@ -7,109 +6,129 @@ import AnalyzeToken from "@/components/AnalyzeToken";
 import InsightCard from "@/components/InsightCard";
 import { useInsights } from "@/context/InsightsContext";
 
+const ICONS = [CheckCircle, AlertCircle, Shield, Moon, Sun, Heart];
+
 export default function DashboardPage() {
   const { insightsData, setInsightsData } = useInsights();
-  const { insights, totalPosts, totalComments, profile } = insightsData;
-  const total = insights.length || 1;
+  const {
+    insights = [],
+    insightMetrics = [],
+    recommendations = [],
+    profile,
+    totalPosts = 0,
+    totalComments = 0
+  } = insightsData;
 
-  // Only fetch if no insights yet
+  const total = insights.length || 1;
   const token = Cookies.get("fb_token");
 
-  // --- Metrics calculation ---
-  const sentimentCounts = { positive: 0, negative: 0, neutral: 0 };
-  let nightPosts = 0, locationMentions = 0, respectfulCount = 0;
-
-  insights.forEach(item => {
-    const label = (item.label || "").toLowerCase();
-    if (sentimentCounts[label] !== undefined) sentimentCounts[label]++;
-    if (item.timestamp && new Date(item.timestamp).getHours() >= 23) nightPosts++;
-    if (item.mentions_location) locationMentions++;
-    if (item.is_respectful) respectfulCount++;
-  });
-
-  const insightMetrics = [
-    { title: "Positive Sentiment", value: `${Math.round((sentimentCounts.positive / total) * 100)}%`, rating: getSentimentRating(sentimentCounts.positive / total * 100) },
-    { title: "Healthy Usage", value: `${Math.round(100 - (nightPosts / total) * 100)}%`, rating: getHealthyRating(100 - (nightPosts / total) * 100) },
-    { title: "Privacy Awareness", value: `${Math.round(100 - (locationMentions / total) * 100)}%`, rating: getPrivacyRating(100 - (locationMentions / total) * 100) },
-    { title: "Respectful Interactions", value: `${Math.round((respectfulCount / total) * 100)}%`, rating: getRespectRating((respectfulCount / total) * 100) },
-  ];
-
-  const posPercent = (sentimentCounts.positive / total) * 100;
-  const healthyPercent = 100 - (nightPosts / total) * 100;
-  const privacyPercent = 100 - (locationMentions / total) * 100;
-  const respectPercent = (respectfulCount / total) * 100;
-
-  const recommendations = [];
-  if (posPercent >= 80) recommendations.push({ icon: CheckCircle, text: "Your interactions are highly positive." });
-  else if (posPercent >= 50) recommendations.push({ icon: AlertCircle, text: "Some interactions could be more positive." });
-  else recommendations.push({ icon: AlertCircle, text: "Work on improving positivity in your posts." });
-
-  if (healthyPercent >= 80) recommendations.push({ icon: Sun, text: "Healthy posting schedule." });
-  else recommendations.push({ icon: Moon, text: "Consider reducing late-night activity." });
-
-  if (privacyPercent >= 80) recommendations.push({ icon: Shield, text: "Minimal location info shared." });
-  else recommendations.push({ icon: Shield, text: "You share location frequently, adjust privacy settings." });
-
-  if (respectPercent >= 75) recommendations.push({ icon: Heart, text: "Excellent respect in interactions." });
-  else if (respectPercent >= 50) recommendations.push({ icon: AlertCircle, text: "Some comments may be disrespectful." });
-  else recommendations.push({ icon: AlertCircle, text: "Improve your tone and respectfulness." });
+  const score = insightMetrics.reduce((sum, m) => sum + m.value, 0) / (insightMetrics.length || 1);
+  let bannerText = "Good Digital Behavior";
+  let bannerColor = "bg-green-400";
+  if (score < 40) {
+    bannerText = "Needs Attention";
+    bannerColor = "bg-red-400";
+  }else if (score < 60) {
+    bannerText = "Needs Attention";
+    bannerColor = "bg-yellow-400";
+  }else if (score < 60) {
+    bannerText = "Medium Behavior";
+    bannerColor = "bg-pink-400";
+  } else if (score < 80) {
+    bannerText = "Average Behavior";
+    bannerColor = "bg-blue-400";
+  }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h2 className="text-4xl font-extrabold text-indigo-400 mb-6 text-center">Dashboard</h2>
-
-      {!token && <p className="text-center text-red-500 mb-4">Facebook token not found. Please login first.</p>}
-
-      {token && insights.length === 0 && <AnalyzeToken token={token} method="ml" onInsightsFetched={setInsightsData} />}
+    <div className="p-6 max-w-7xl mx-auto space-y-8">
+ 
       {profile && (
-        <div className="flex items-center bg-gray-900 p-4 rounded-lg border border-gray-700 mb-6">
-          <img
+        <div className={`${bannerColor} rounded-3xl p-6 flex justify-between items-center shadow-lg`}>
+          <div>
+            <h2 className="text-3xl font-bold text-white drop-shadow-lg">{bannerText}</h2>
+            <p className="text-white/90 mt-1">Your Facebook activity analyzed in real-time</p>
+          </div>
+          <div className="flex items-center bg-white p-4 rounded-2xl shadow-md">
+            <img
               src={profile.picture?.data?.url}
               alt="Profile"
-              className="rounded-full w-20 h-20 mr-4"
+              className="rounded-full w-20 h-20 mr-4 border-2 border-gray-200"
             />
-          <div className="text-gray-200">
-            <p className="font-semibold text-xl">{profile.name}</p>
-            <p>Birthday: {profile.birthday || "N/A"}</p>
-            <p>Gender: {profile.gender || "N/A"}</p>
+            <div>
+              <p className="font-semibold text-gray-800">{profile.name}</p>
+              <p className="text-gray-500 text-sm">{profile.gender || "N/A"}</p>
+              <p className="text-gray-500 text-sm">{profile.birthday || "N/A"}</p>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="mt-2 text-gray-400 text-sm text-center">
-        Total Posts: {totalPosts} | Total Comments: {totalComments} | Total Interactions: {total}
-      </div>
+      {!token && (
+        <p className="text-center text-red-500 mb-6 font-semibold animate-pulse">
+          Facebook token not found. Please login first.
+        </p>
+      )}
+
+      {token && insights.length === 0 && (
+        <AnalyzeToken token={token} method="ml" onInsightsFetched={setInsightsData} />
+      )}
 
       <motion.div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 my-6"
+        className="flex justify-around bg-white rounded-2xl shadow-md p-6 text-center"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div>
+          <p className="text-2xl font-bold text-indigo-500">{totalPosts}</p>
+          <p className="text-gray-500">Posts</p>
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-pink-500">{totalComments}</p>
+          <p className="text-gray-500">Comments</p>
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-green-500">{total}</p>
+          <p className="text-gray-500">Interactions</p>
+        </div>
+      </motion.div>
+
+      {/* Insight Metrics */}
+      <motion.div
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
         initial="hidden"
         animate="visible"
         variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.15 } } }}
       >
         {insightMetrics.map((metric, idx) => (
-          <InsightCard key={idx} title={metric.title} value={metric.value} rating={metric.rating} />
+          <InsightCard
+            key={idx}
+            title={metric.title}
+            value={`${metric.value}%`}
+            rating={metric.rating || ""}
+            className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg hover:shadow-xl p-5 transition"
+          />
         ))}
       </motion.div>
 
-      <div className="mt-10">
-        <h3 className="text-2xl font-semibold mb-4 text-indigo-300">Personalized Recommendations</h3>
+      <div>
+        <h3 className="text-3xl font-bold mb-5 text-indigo-400">Personalized Recommendations</h3>
         <motion.ul
           initial="hidden"
           animate="visible"
           variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
-          className="space-y-3"
+          className="space-y-4"
         >
           {recommendations.map((rec, idx) => {
-            const Icon = rec.icon;
+            const Icon = ICONS[idx % ICONS.length];
             return (
               <motion.li
                 key={idx}
-                className="flex items-center space-x-2 bg-gray-900 p-3 rounded-lg shadow-md border border-gray-700 hover:border-indigo-400 transition"
+                className="flex items-center space-x-3 bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-4 shadow-lg transition transform "
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
               >
-                <Icon className="w-5 h-5 text-indigo-400 flex-shrink-0" />
-                <span className="text-gray-200">{rec.text}</span>
+                <Icon className="w-6 h-6 text-pink-400 flex-shrink-0" />
+                <span className="text-gray-700 font-medium">{rec.text}</span>
               </motion.li>
             );
           })}
@@ -118,8 +137,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-function getSentimentRating(val) { return val >= 75 ? "Excellent" : val >= 50 ? "Good" : "Needs Work"; }
-function getHealthyRating(val) { return val >= 80 ? "Balanced" : "Try Reducing Late Usage"; }
-function getPrivacyRating(val) { return val >= 80 ? "Good" : "Watch Location Sharing"; }
-function getRespectRating(val) { return val >= 75 ? "Excellent" : "Improve Respectfulness"; }
