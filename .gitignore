@@ -137,3 +137,26 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Python bytecode
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+*/.env
+.env
+*.env
+.env.*
+
+.venv/
+venv/
+ENV/
+env/
+/backend/ml_models/models/sentiment/checkpoint-11346
+/backend/ml_models/models/sentiment/model.safetensors
+backend/ml_models/models/sentiment/model.safetensors
+backend/ml_models/models/sentiment/safetensors.zip
+
+backend/ml_models/models/sentiment/*.safetensors
+backend/ml_models/models/sentiment/*.zip
+backend/ml_models/models/sentiment/checkpoint-*
