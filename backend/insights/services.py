@@ -14,65 +14,74 @@ translator = Translator()
 # =========================
 # 📌 NLP Analysis Functions
 # =========================
+def remove_variation_selectors(text: str) -> str:
+    """Remove variation selectors (U+FE0F) to normalize emojis."""
+    return text.replace("\ufe0f", "")
+
 def analyze_text(text: str, method="ml") -> dict:
-    """
-    Analyze text sentiment using ML sentiment model or fallback.
-    Handles emoji-only posts, very short posts, and non-English text.
-    Returns {original, translated, label}.
-    """
     if not text or text.strip() == "":
         return {"original": text, "translated": text, "label": "neutral"}
 
     original_text = text.strip()
+    clean_text = remove_variation_selectors(original_text)
 
-    # Emoji-only check
-    if all(char in EMOJI_DATA or char.isspace() for char in original_text):
-        logger.debug(f"Emoji-only post detected: {original_text}")
+    # ---------- Emoji-only check ----------
+    if all(char in EMOJI_DATA or char.isspace() for char in clean_text):
+        positive_emojis = {"❤️", "❤", "💖", "😍", "😂", "😊", "🥰", "👍"}
+        negative_emojis = {"😢", "😡", "💔", "😠", "😞"}
+
+        # If any positive emoji → positive
+        if any(remove_variation_selectors(e) in clean_text for e in positive_emojis):
+            return {"original": original_text, "translated": original_text, "label": "positive"}
+
+        # If any negative emoji → negative
+        if any(remove_variation_selectors(e) in clean_text for e in negative_emojis):
+            return {"original": original_text, "translated": original_text, "label": "negative"}
+
+        # Otherwise → neutral
         return {"original": original_text, "translated": original_text, "label": "neutral"}
 
-    # Convert emojis to text
+    # ---------- Emoji-heavy posts (>50%) ----------
+    emoji_ratio = sum(1 for ch in clean_text if ch in EMOJI_DATA) / len(clean_text)
+    if emoji_ratio > 0.5:
+        return {"original": original_text, "translated": original_text, "label": "positive"}
+
+    # ---------- Convert emojis to text for ML ----------
     processed_text = demojize(original_text)
 
-    # Skip very short posts (<4 characters after conversion)
+    # Skip very short posts (<4 chars after conversion)
     if len(processed_text) < 4:
-        logger.debug(f"Short post skipped for sentiment: {processed_text}")
         return {"original": original_text, "translated": processed_text, "label": "neutral"}
 
     translated_text = processed_text
 
-    # Detect language & translate
+    # ---------- Language detection & translation ----------
     try:
         lang = detect(processed_text)
-    except LangDetectException:
+    except:
         lang = "en"
 
     if lang != "en":
         try:
             translated_text = translator.translate(processed_text, dest="en").text
-        except Exception as e:
-            logger.warning(f"Translation failed: {e}")
+        except:
             translated_text = processed_text
 
+    # ---------- ML Sentiment Prediction ----------
     label = "neutral"
-
-    # ML Sentiment Prediction
     if method == "ml" and insight_models.sentiment_model:
         try:
             pred = insight_models.sentiment_model.predict([translated_text])
-            logger.debug(f"Original: {original_text}, Translated: {translated_text}, Raw Prediction: {pred}")
-
             pred_value = pred[0]
+
             if isinstance(pred_value, str):
                 label = pred_value.lower()
             elif isinstance(pred_value, int):
                 label = {0: "negative", 1: "neutral", 2: "positive"}.get(pred_value, "neutral")
             else:
                 label = "neutral"
-        except Exception as e:
-            logger.error(f"Sentiment model error: {e}")
+        except:
             label = "neutral"
-    else:
-        logger.info("ML method not used or sentiment model not loaded.")
 
     return {"original": original_text, "translated": translated_text, "label": label}
 
@@ -80,18 +89,12 @@ def analyze_text(text: str, method="ml") -> dict:
 # =========================
 # 📌 Extra Analysis Features
 # =========================
-
 def mentions_location(text: str):
-    """
-    Check if text contains a city/country from locations_model dataset.
-    Returns matched location (city/country) or None.
-    """
     if not text:
         return None
 
     lowered = text.lower()
 
-    # 1. Check in dataset
     if insight_models.locations_model:
         try:
             for entry in insight_models.locations_model:
@@ -111,7 +114,6 @@ def mentions_location(text: str):
         except Exception as e:
             logger.error(f"Location model error: {e}")
 
-    # 2. Fallback: manually check common Sri Lankan cities
     fallback_cities = [
         "colombo", "kandy", "galle", "jaffna", "batticaloa",
         "trincomalee", "negombo", "kurunegala", "anuradhapura",
@@ -124,21 +126,14 @@ def mentions_location(text: str):
     return None
 
 
-
 def is_toxic(text: str) -> bool:
-    """
-    Uses the toxic_model + keyword fallback.
-    Returns True if text is toxic.
-    """
     if not text:
         return False
 
-    # keyword fallback
     toxic_keywords = ["shit", "fuck", "bitch", "asshole", "bastard"]
     lowered = text.lower()
     keyword_match = any(word in lowered for word in toxic_keywords)
 
-    # model check
     model_prediction = False
     if insight_models.toxic_model:
         try:
@@ -150,9 +145,6 @@ def is_toxic(text: str) -> bool:
 
 
 def is_respectful(text: str) -> bool:
-    """
-    Respectful = not toxic.
-    """
     return not is_toxic(text)
 
 
@@ -165,13 +157,32 @@ def discloses_personal_info(text: str) -> bool:
 
 
 def is_potential_misinformation(text: str) -> bool:
-    if not text or not insight_models.misinfo_model:
+    """
+    Only run misinfo model on meaningful content (>4 non-emoji chars)
+    """
+    if not text or text.strip() == "":
         return False
+
+    # Count non-emoji characters
+    non_emoji_chars = sum(1 for ch in text if ch not in EMOJI_DATA and not ch.isspace())
+    if non_emoji_chars < 4:
+        return False  # Skip short/emoji-only text
+
+    if not insight_models.misinfo_model:
+        return False
+
     try:
-        return bool(insight_models.misinfo_model.predict([text])[0])
+        pred = insight_models.misinfo_model.predict([text])[0]
+        if isinstance(pred, (int, float)):
+            return bool(round(pred))
+        if isinstance(pred, str):
+            return pred.lower() in ["true", "yes", "1", "misinfo", "misinformation"]
+        if isinstance(pred, (list, tuple)):
+            return pred[0] > 0.5
     except Exception as e:
         logger.error(f"Misinfo model error: {e}")
-        return False
+
+    return False
 
 
 # =========================
@@ -184,16 +195,13 @@ def compute_insight_metrics(insights: list):
     location_mentions = 0
     respectful_count = 0
 
-    # Set your local timezone (Sri Lanka example)
     local_tz = pytz.timezone("Asia/Colombo")
 
     for item in insights:
-        # ✅ Count sentiment
         label = (item.get("label") or "").lower()
         if label in sentiment_counts:
             sentiment_counts[label] += 1
 
-        # ✅ Handle timestamp properly
         if item.get("timestamp"):
             try:
                 dt = datetime.fromisoformat(item["timestamp"].replace("Z", ""))
@@ -201,24 +209,17 @@ def compute_insight_metrics(insights: list):
                     dt = dt.replace(tzinfo=pytz.UTC)
                 dt_local = dt.astimezone(local_tz)
                 hour = dt_local.hour
-
-                # Night post = 11pm → 6am
                 if hour >= 23 or hour < 6:
                     night_posts += 1
             except Exception as e:
                 logger.warning(f"Invalid timestamp format: {item['timestamp']} ({e})")
 
-        # ✅ Location mentions
         if item.get("mentions_location"):
             location_mentions += 1
 
-        # ✅ Respectful check
         if item.get("is_respectful"):
             respectful_count += 1
-        
-        if item.get("is_potential_misinformation"):
-            respectful_count -= 1 
-    # Metrics
+
     insightMetrics = [
         {"title": "Happy Posts", "value": round((sentiment_counts['positive'] / total) * 100)},
         {"title": "Good Posting Habits", "value": round(100 - (night_posts / total) * 100)},
@@ -226,7 +227,6 @@ def compute_insight_metrics(insights: list):
         {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
     ]
 
-    # Recommendation logic
     pos_percent = (sentiment_counts['positive'] / total) * 100
     healthy_percent = 100 - (night_posts / total) * 100
     privacy_percent = 100 - (location_mentions / total) * 100
@@ -258,8 +258,10 @@ def compute_insight_metrics(insights: list):
     
     if respect_percent >= 75:
         recommendations.append({"text": random.choice(rec_pool["respect_high"])})
+
     elif respect_percent >= 50:
         recommendations.append({"text": random.choice(rec_pool["respect_medium"])})
+
     else:
         recommendations.append({"text": random.choice(rec_pool["respect_low"])})
 

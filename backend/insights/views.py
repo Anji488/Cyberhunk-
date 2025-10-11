@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 MAX_THREADS = 5
 REQUEST_DELAY = 0.3
-DEFAULT_MAX_POSTS = 10
+DEFAULT_MAX_POSTS = 20
 MAX_COMMENTS = 20
 MAX_NESTED = 5
 
