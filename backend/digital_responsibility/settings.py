@@ -55,13 +55,16 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'digital_responsibility.urls'
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / "templates"],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -144,5 +147,5 @@ ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "cyberhunk.onrender.com",
-    "cyberhunk.vercel.app/", 
+    "cyberhunk.vercel.app", 
 ]
