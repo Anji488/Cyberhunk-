@@ -30,15 +30,10 @@ def analyze_text(text: str, method="ml") -> dict:
         positive_emojis = {"❤️", "❤", "💖", "😍", "😂", "😊", "🥰", "👍"}
         negative_emojis = {"😢", "😡", "💔", "😠", "😞"}
 
-        # If any positive emoji → positive
         if any(remove_variation_selectors(e) in clean_text for e in positive_emojis):
             return {"original": original_text, "translated": original_text, "label": "positive"}
-
-        # If any negative emoji → negative
         if any(remove_variation_selectors(e) in clean_text for e in negative_emojis):
             return {"original": original_text, "translated": original_text, "label": "negative"}
-
-        # Otherwise → neutral
         return {"original": original_text, "translated": original_text, "label": "neutral"}
 
     # ---------- Emoji-heavy posts (>50%) ----------
@@ -48,8 +43,6 @@ def analyze_text(text: str, method="ml") -> dict:
 
     # ---------- Convert emojis to text for ML ----------
     processed_text = demojize(original_text)
-
-    # Skip very short posts (<4 chars after conversion)
     if len(processed_text) < 4:
         return {"original": original_text, "translated": processed_text, "label": "neutral"}
 
@@ -58,30 +51,29 @@ def analyze_text(text: str, method="ml") -> dict:
     # ---------- Language detection & translation ----------
     try:
         lang = detect(processed_text)
-    except:
+    except LangDetectException:
         lang = "en"
 
     if lang != "en":
         try:
             translated_text = translator.translate(processed_text, dest="en").text
-        except:
+        except Exception:
             translated_text = processed_text
 
     # ---------- ML Sentiment Prediction ----------
     label = "neutral"
-    if method == "ml" and insight_models.sentiment_model:
-        try:
-            pred = insight_models.sentiment_model.predict([translated_text])
-            pred_value = pred[0]
-
-            if isinstance(pred_value, str):
-                label = pred_value.lower()
-            elif isinstance(pred_value, int):
-                label = {0: "negative", 1: "neutral", 2: "positive"}.get(pred_value, "neutral")
-            else:
-                label = "neutral"
-        except:
-            label = "neutral"
+    if method == "ml":
+        sentiment_model = insight_models.get_sentiment_model()
+        if sentiment_model:
+            try:
+                pred = sentiment_model.predict([translated_text])
+                pred_value = pred[0]
+                if isinstance(pred_value, str):
+                    label = pred_value.lower()
+                elif isinstance(pred_value, int):
+                    label = {0: "negative", 1: "neutral", 2: "positive"}.get(pred_value, "neutral")
+            except Exception as e:
+                logger.error(f"Sentiment model error: {e}")
 
     return {"original": original_text, "translated": translated_text, "label": label}
 
@@ -94,10 +86,10 @@ def mentions_location(text: str):
         return None
 
     lowered = text.lower()
-
-    if insight_models.locations_model:
+    locations_model = insight_models.get_locations_model()
+    if locations_model:
         try:
-            for entry in insight_models.locations_model:
+            for entry in locations_model:
                 if isinstance(entry, (list, tuple)) and len(entry) >= 3:
                     city, country = entry[1].lower(), entry[2].lower()
                     if city in lowered:
@@ -135,9 +127,10 @@ def is_toxic(text: str) -> bool:
     keyword_match = any(word in lowered for word in toxic_keywords)
 
     model_prediction = False
-    if insight_models.toxic_model:
+    toxic_model = insight_models.get_toxic_model()
+    if toxic_model:
         try:
-            model_prediction = bool(insight_models.toxic_model.predict([text])[0])
+            model_prediction = bool(toxic_model.predict([text])[0])
         except Exception as e:
             logger.error(f"Toxic model error: {e}")
 
@@ -157,22 +150,19 @@ def discloses_personal_info(text: str) -> bool:
 
 
 def is_potential_misinformation(text: str) -> bool:
-    """
-    Only run misinfo model on meaningful content (>4 non-emoji chars)
-    """
     if not text or text.strip() == "":
         return False
 
-    # Count non-emoji characters
     non_emoji_chars = sum(1 for ch in text if ch not in EMOJI_DATA and not ch.isspace())
     if non_emoji_chars < 4:
-        return False  # Skip short/emoji-only text
+        return False
 
-    if not insight_models.misinfo_model:
+    misinfo_model = insight_models.get_misinfo_model()
+    if not misinfo_model:
         return False
 
     try:
-        pred = insight_models.misinfo_model.predict([text])[0]
+        pred = misinfo_model.predict([text])[0]
         if isinstance(pred, (int, float)):
             return bool(round(pred))
         if isinstance(pred, str):
@@ -255,13 +245,11 @@ def compute_insight_metrics(insights: list):
 
     recommendations.append({"text": random.choice(rec_pool["healthy"] if healthy_percent >= 80 else rec_pool["unhealthy"])})
     recommendations.append({"text": random.choice(rec_pool["privacy_good"] if privacy_percent >= 80 else rec_pool["privacy_bad"])})
-    
+
     if respect_percent >= 75:
         recommendations.append({"text": random.choice(rec_pool["respect_high"])})
-
     elif respect_percent >= 50:
         recommendations.append({"text": random.choice(rec_pool["respect_medium"])})
-
     else:
         recommendations.append({"text": random.choice(rec_pool["respect_low"])})
 
