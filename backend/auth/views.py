@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 FACEBOOK_CLIENT_ID = settings.FB_APP_ID
 FACEBOOK_CLIENT_SECRET = settings.FB_APP_SECRET
-FRONTEND_URL = getattr(settings, "FRONTEND_URL", "http://localhost:3000")  # React frontend
+FRONTEND_URL = getattr(settings, "FRONTEND_URL", "https://cyberhunk-lfqcts7m2-anjani-s-projects-80d27d52.vercel.app/")  # React frontend
 
 def facebook_login(request):
     fb_auth_url = "https://www.facebook.com/v15.0/dialog/oauth"

@@ -1,5 +1,5 @@
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = "https://cyberhunk.onrender.com";
 
 export async function fetchPosts() {
     const res = await fetch(`${API_URL}/posts/`);
