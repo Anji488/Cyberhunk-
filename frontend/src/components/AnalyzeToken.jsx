@@ -29,7 +29,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
           setLoading(false);
           return; // already loaded from cache
         }
-        const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+        const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
         // 2️⃣ Fetch insights from backend (includes profile, metrics, recommendations)
         const res = await axios.get(

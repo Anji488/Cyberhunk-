@@ -5,7 +5,7 @@ import { Sun, BookOpen, Globe } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Login() {
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
   return (
     <div className="min-h-screen relative bg-white font-sans overflow-hidden flex flex-col items-center justify-start py-20 px-6 md:px-20">
 
