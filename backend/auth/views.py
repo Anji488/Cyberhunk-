@@ -35,23 +35,25 @@ def facebook_callback(request):
         "client_secret": FACEBOOK_CLIENT_SECRET,
         "code": code,
     }
-    r = requests.get(token_url, params=params)
-    if r.status_code != 200:
+
+    try:
+        r = requests.get(token_url, params=params)
+        r.raise_for_status()
+        access_token = r.json().get("access_token")
+        if not access_token:
+            return HttpResponse("Access token not found", status=400)
+    except requests.RequestException:
         return HttpResponse("Failed to get access token", status=400)
 
-    access_token = r.json().get("access_token")
-    if not access_token:
-        return HttpResponse("Access token not found", status=400)
-
-    # ✅ Set the token as a cross-domain cookie
+    # ✅ Only here is response defined
+    response = redirect(f"{FRONTEND_URL}/dashboard")
     response.set_cookie(
         "fb_token",
         access_token,
         httponly=False,
-        secure=True,
-        samesite="None",
-        max_age=3600 * 24 * 7
+        max_age=3600 * 24 * 7,  # 7 days
+        samesite="Lax",
+        secure=(settings.BASE_URL.startswith("https://"))
     )
-    response = redirect(f"{FRONTEND_URL}/dashboard")
-
     return response
+
