@@ -140,4 +140,10 @@ CORS_ALLOWED_ORIGINS = [
     "https://cyberhunk-lfqcts7m2-anjani-s-projects-80d27d52.vercel.app",  # Vercel frontend
 ]
 
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "cyberhunk.onrender.com",
+    "https://cyberhunk-lfqcts7m2-anjani-s-projects-80d27d52.vercel.app", 
+]
 
