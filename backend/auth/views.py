@@ -44,14 +44,14 @@ def facebook_callback(request):
         return HttpResponse("Access token not found", status=400)
 
     # ✅ Set the token as a cross-domain cookie
-    response = redirect(f"{FRONTEND_URL}/dashboard")
     response.set_cookie(
-    "fb_token",
+        "fb_token",
         access_token,
         httponly=False,
         secure=True,
         samesite="None",
         max_age=3600 * 24 * 7
     )
+    response = redirect(f"{FRONTEND_URL}/dashboard")
 
     return response

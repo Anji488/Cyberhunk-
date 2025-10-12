@@ -9,7 +9,7 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const tokenFromUrl = params.get("token");
+    const tokenFromUrl = new URLSearchParams(window.location.search).get("token");
     const token = Cookies.get("fb_token") || tokenFromUrl;
 
     if (token) {
