@@ -49,22 +49,16 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Layout><Home /></Layout>} />
           <Route path="/login" element={<Layout><Login /></Layout>} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/auth/callback" element={<Layout><AuthCallback /></Layout>} />
           <Route path="/about" element={<Layout><About /></Layout>} />
           <Route path="/features" element={<Layout><Features /></Layout>} />
           <Route path="/our-framework" element={<Layout><Framework /></Layout>} />
           <Route path="/terms" element={<Layout><Terms /></Layout>} />
           <Route path="/privacy-policy" element={<Layout><PrivacyPolicy /></Layout>} />
 
-          <Route path="/dashboard" element={
-            <ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>
-          } />
-          <Route path="/charts" element={
-            <ProtectedRoute><Layout><ChartsPage /></Layout></ProtectedRoute>
-          } />
-          <Route path="/posts" element={
-            <ProtectedRoute><Layout><PostsPage /></Layout></ProtectedRoute>
-          } />
+          <Route path="/dashboard" element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>} />
+          <Route path="/charts" element={<ProtectedRoute><Layout><ChartsPage /></Layout></ProtectedRoute>} />
+          <Route path="/posts" element={<ProtectedRoute><Layout><PostsPage /></Layout></ProtectedRoute>} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

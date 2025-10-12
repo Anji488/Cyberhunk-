@@ -1,4 +1,3 @@
-// File: src/pages/AuthCallback.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
@@ -17,7 +16,7 @@ export default function AuthCallback() {
       // Clear old cached insights
       Cookies.remove("fb_insights");
 
-      // Clean URL to remove token query param
+      // Clean URL to remove token query param and Facebook hash (#_=_)
       window.history.replaceState(null, "", "/dashboard");
 
       // Redirect to dashboard
