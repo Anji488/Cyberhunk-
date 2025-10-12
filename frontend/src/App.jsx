@@ -44,7 +44,6 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <Router>
       <InsightsProvider>
         <Routes>
           <Route path="/" element={<Layout><Home /></Layout>} />
@@ -63,6 +62,5 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </InsightsProvider>
-    </Router>
   );
 }
