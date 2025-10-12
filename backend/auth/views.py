@@ -6,13 +6,14 @@ from urllib.parse import urlencode
 
 FACEBOOK_CLIENT_ID = settings.FB_APP_ID
 FACEBOOK_CLIENT_SECRET = settings.FB_APP_SECRET
-FRONTEND_URL = getattr(settings, "FRONTEND_URL", "https://cyberhunk.vercel.app/")  # React frontend
+BASE_URL = settings.BASE_URL
+FRONTEND_URL = settings.FRONTEND_URL
 
 def facebook_login(request):
     fb_auth_url = "https://www.facebook.com/v15.0/dialog/oauth"
     params = {
         "client_id": FACEBOOK_CLIENT_ID,
-        "redirect_uri": f"{settings.BASE_URL}/auth/facebook/callback/",
+        "redirect_uri": f"{BASE_URL}/auth/facebook/callback/",
         "scope": "email,public_profile,user_posts",
         "response_type": "code",
     }
@@ -29,7 +30,7 @@ def facebook_callback(request):
     token_url = "https://graph.facebook.com/v15.0/oauth/access_token"
     params = {
         "client_id": FACEBOOK_CLIENT_ID,
-        "redirect_uri": f"{settings.BASE_URL}/auth/facebook/callback/",
+        "redirect_uri": f"{BASE_URL}/auth/facebook/callback/",
         "client_secret": FACEBOOK_CLIENT_SECRET,
         "code": code,
     }
@@ -43,5 +44,12 @@ def facebook_callback(request):
 
     # Set the token as a cookie so React can read it
     response = redirect(f"{FRONTEND_URL}/dashboard")
-    response.set_cookie("fb_token", access_token, httponly=False, max_age=3600*24*7)  # 7 days
+    response.set_cookie(
+        "fb_token",
+        access_token,
+        httponly=False,
+        max_age=3600 * 24 * 7,  # 7 days
+        samesite="Lax",
+        secure=(settings.BASE_URL.startswith("https://"))
+    )
     return response

@@ -1,3 +1,4 @@
+// File: src/components/AnalyzeToken.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Cookies from "js-cookie";
@@ -19,7 +20,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
     const fetchData = async () => {
       setLoading(true);
       try {
-        // 1️⃣ Check if cached data exists
+        // Check for cached data
         const cachedData = Cookies.get("fb_insights");
         if (cachedData) {
           const parsed = JSON.parse(cachedData);
@@ -27,10 +28,10 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
           setInsights(parsed.insights || []);
           if (onInsightsFetched) onInsightsFetched(parsed);
           setLoading(false);
-          return; // already loaded from cache
+          return;
         }
 
-        // 2️⃣ Fetch insights from backend (includes profile, metrics, recommendations)
+        // Fetch insights from backend
         const res = await axios.get(
           `https://cyberhunk.onrender.com/insights/analyze/?token=${token}&method=${method}`,
           { withCredentials: true }
@@ -40,7 +41,6 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
         setProfile(profileData);
         setInsights(fetchedInsights || []);
 
-        // Prepare data for caching
         const totalPosts = fetchedInsights.filter(i => i.type === "post").length;
         const totalComments = fetchedInsights.filter(i => i.type === "comment").length;
 
@@ -53,8 +53,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
           recommendations: res.data.recommendations || []
         };
 
-        Cookies.set("fb_insights", JSON.stringify(finalData), { expires: 1 }); // 1 day
-
+        Cookies.set("fb_insights", JSON.stringify(finalData), { expires: 1 }); // cache 1 day
         if (onInsightsFetched) onInsightsFetched(finalData);
 
       } catch (err) {
@@ -68,11 +67,19 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
     fetchData();
   }, [method, propToken, onInsightsFetched]);
 
-  if (loading) return <p className="text-gray-600">Analyzing token...</p>;
-  if (error) return <p className="text-red-500">{error}</p>;
+  if (loading)
+    return (
+      <div className="flex items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-indigo-500 border-opacity-75"></div>
+        <span className="ml-3 text-gray-400">Analyzing token...</span>
+      </div>
+    );
+
+  if (error)
+    return <p className="text-red-500 font-medium p-4">{error}</p>;
+
   if (!profile) return null;
 
-  // Display profile: left picture, right details
   return (
     <div className="flex items-center bg-gray-900 p-4 rounded-lg border border-gray-700 mb-6">
       <img
