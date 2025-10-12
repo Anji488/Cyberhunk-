@@ -22,5 +22,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('auth.urls')),
     path('insights/', include('insights.urls')),
-    path('', lambda request: HttpResponseRedirect('https://cyberhunk-lfqcts7m2-anjani-s-projects-80d27d52.vercel.app/')),  # redirect root to frontend
+    path('', lambda request: HttpResponseRedirect('https://cyberhunk.vercel.app/')),  # redirect root to frontend
 ]
