@@ -28,9 +28,12 @@ export default function DashboardPage() {
   if (score < 40) {
     bannerText = "Needs Attention";
     bannerColor = "bg-red-400";
-  } else if (score < 60) {
+  }else if (score < 60) {
     bannerText = "Needs Attention";
     bannerColor = "bg-yellow-400";
+  }else if (score < 60) {
+    bannerText = "Medium Behavior";
+    bannerColor = "bg-pink-400";
   } else if (score < 80) {
     bannerText = "Average Behavior";
     bannerColor = "bg-blue-400";
@@ -38,6 +41,7 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
+ 
       {profile && (
         <div className={`${bannerColor} rounded-3xl p-6 flex justify-between items-center shadow-lg`}>
           <div>
@@ -88,6 +92,7 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
+      {/* Insight Metrics */}
       <motion.div
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
         initial="hidden"
@@ -118,7 +123,7 @@ export default function DashboardPage() {
             return (
               <motion.li
                 key={idx}
-                className="flex items-center space-x-3 bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-4 shadow-lg transition transform"
+                className="flex items-center space-x-3 bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-4 shadow-lg transition transform "
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
               >
