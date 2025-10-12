@@ -16,9 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import HttpResponseRedirect
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('auth.urls')),
     path('insights/', include('insights.urls')),
+    path('', lambda request: HttpResponseRedirect('https://cyberhunk-lfqcts7m2-anjani-s-projects-80d27d52.vercel.app/')),  # redirect root to frontend
 ]
