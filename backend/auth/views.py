@@ -46,11 +46,12 @@ def facebook_callback(request):
     # ✅ Set the token as a cross-domain cookie
     response = redirect(f"{FRONTEND_URL}/dashboard")
     response.set_cookie(
-        "fb_token",
+    "fb_token",
         access_token,
-        httponly=False,             # frontend (React) can read it
-        secure=True,                # required for HTTPS
-        samesite="None",            # required for cross-domain cookies
-        max_age=3600 * 24 * 7       # 7 days
+        httponly=False,
+        secure=True,
+        samesite="None",
+        max_age=3600 * 24 * 7
     )
+
     return response

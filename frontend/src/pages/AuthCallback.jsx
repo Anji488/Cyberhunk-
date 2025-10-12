@@ -9,29 +9,19 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
+    const tokenFromUrl = params.get("token");
+    const token = Cookies.get("fb_token") || tokenFromUrl;
 
     if (token) {
-      // ✅ Save token in a frontend cookie (7 days)
-      Cookies.set("fb_token", token, {
-        expires: 7,
-        sameSite: "Lax",
-        secure: true,
-      });
-
-      // ✅ Clear old cached insights
+      Cookies.set("fb_token", token, { expires: 7, sameSite: "Lax", secure: true });
       Cookies.remove("fb_insights");
-
-      // ✅ Clean URL (remove ?token=...)
       window.history.replaceState({}, document.title, "/dashboard");
-
-      // ✅ Redirect to dashboard
       navigate("/dashboard", { replace: true });
     } else {
-      setStatus("error");
-      setTimeout(() => navigate("/login", { replace: true }), 1500);
+      navigate("/login", { replace: true });
     }
   }, [navigate]);
+
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-950 text-gray-200">
