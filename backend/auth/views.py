@@ -9,6 +9,7 @@ FACEBOOK_CLIENT_SECRET = settings.FB_APP_SECRET
 BASE_URL = settings.BASE_URL
 FRONTEND_URL = settings.FRONTEND_URL
 
+
 def facebook_login(request):
     fb_auth_url = "https://www.facebook.com/v15.0/dialog/oauth"
     params = {
@@ -42,14 +43,14 @@ def facebook_callback(request):
     if not access_token:
         return HttpResponse("Access token not found", status=400)
 
-    # Set the token as a cookie so React can read it
+    # ✅ Set the token as a cross-domain cookie
     response = redirect(f"{FRONTEND_URL}/dashboard")
     response.set_cookie(
         "fb_token",
         access_token,
-        httponly=False,
-        max_age=3600 * 24 * 7,  # 7 days
-        samesite="Lax",
-        secure=(settings.BASE_URL.startswith("https://"))
+        httponly=False,             # frontend (React) can read it
+        secure=True,                # required for HTTPS
+        samesite="None",            # required for cross-domain cookies
+        max_age=3600 * 24 * 7       # 7 days
     )
     return response

@@ -149,3 +149,14 @@ ALLOWED_HOSTS = [
     "cyberhunk.onrender.com",
     "cyberhunk.vercel.app", 
 ]
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://cyberhunk.vercel.app",
+    "https://cyberhunk.onrender.com",
+]
+
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
