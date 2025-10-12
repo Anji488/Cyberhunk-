@@ -58,7 +58,7 @@ ROOT_URLCONF = 'digital_responsibility.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -137,13 +137,12 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React frontend (local dev)
     "https://cyberhunk.onrender.com",  # Render backend
-    "https://cyberhunk.vercel.app/",  # Vercel frontend
+    "https://cyberhunk.vercel.app",  # Vercel frontend
 ]
 
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "cyberhunk.onrender.com",
-    "https://cyberhunk.vercel.app/", 
+    "cyberhunk.vercel.app/", 
 ]
-

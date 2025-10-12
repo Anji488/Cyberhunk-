@@ -16,11 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.http import HttpResponseRedirect
+from django.shortcuts import render
+
+def home_view(request):
+    return render(request, "index.html")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('auth.urls')),
     path('insights/', include('insights.urls')),
-    path('', lambda request: HttpResponseRedirect('https://cyberhunk.vercel.app/')),  # redirect root to frontend
+    path('', home_view, name='home'), 
 ]
