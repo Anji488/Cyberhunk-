@@ -130,8 +130,8 @@ from decouple import config
 FB_APP_ID = config("FB_APP_ID")
 FB_APP_SECRET = config("FB_APP_SECRET")
 
-BASE_URL = "http://localhost:8000"       # Django backend URL
-FRONTEND_URL = "http://localhost:3000"   # React frontend URL
+BASE_URL = config("BASE_URL", default="http://localhost:8000")
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
@@ -145,5 +145,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "cyberhunk.onrender.com",
     "https://cyberhunk-lfqcts7m2-anjani-s-projects-80d27d52.vercel.app", 
+    FRONTEND_URL, 
+    BASE_URL, 
 ]
 
