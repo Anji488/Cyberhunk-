@@ -135,6 +135,9 @@ FRONTEND_URL = "http://localhost:3000"   # React frontend URL
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # React frontend
+    "http://localhost:3000",  # React frontend (local dev)
+    "https://cyberhunk.onrender.com",  # Render backend
+    "https://cyberhunk-lfqcts7m2-anjani-s-projects-80d27d52.vercel.app",  # Vercel frontend
 ]
+
 
