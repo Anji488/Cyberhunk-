@@ -9,7 +9,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState(null);
 
-  const BACKEND_URL = "https://cyberhunk.onrender.com/";
+  const BACKEND_URL = "https://cyberhunk.onrender.com";
 
   useEffect(() => {
     const token = propToken || Cookies.get("fb_token");

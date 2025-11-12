@@ -56,7 +56,7 @@ export default function Dashboard() {
 
 
       try {
-        const res = await axios.get(`https://cyberhunk.onrender.com//insights/analyze?token=${token}&method=ml`);
+        const res = await axios.get(`https://cyberhunk.onrender.com/insights/analyze?token=${token}&method=ml`);
         const insights = res.data.insights || [];
         setInsights(insights);
 

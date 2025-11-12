@@ -1,5 +1,5 @@
 
-const API_URL = "https://spurtive-subtilely-earl.ngrok-free.dev";
+const API_URL = "https://https://cyberhunk.onrender.com";
 
 export async function fetchPosts() {
     const res = await fetch(`${API_URL}/posts/`);
