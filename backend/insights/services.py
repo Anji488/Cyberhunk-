@@ -3,7 +3,8 @@ import logging
 import random
 from langdetect import detect, LangDetectException
 from googletrans import Translator
-from insights import models as insight_models
+from insights import hf_models as insight_models  # Use Hugging Face models
+from insights.hf_models import map_sentiment_label
 from emoji import demojize, EMOJI_DATA  # For emoji detection
 from datetime import datetime
 import pytz
@@ -18,6 +19,7 @@ def remove_variation_selectors(text: str) -> str:
     """Remove variation selectors (U+FE0F) to normalize emojis."""
     return text.replace("\ufe0f", "")
 
+
 def analyze_text(text: str, method="ml") -> dict:
     if not text or text.strip() == "":
         return {"original": text, "translated": text, "label": "neutral"}
@@ -25,58 +27,49 @@ def analyze_text(text: str, method="ml") -> dict:
     original_text = text.strip()
     clean_text = remove_variation_selectors(original_text)
 
-    # ---------- Emoji-only check ----------
-    if all(char in EMOJI_DATA or char.isspace() for char in clean_text):
-        positive_emojis = {"❤️", "❤", "💖", "😍", "😂", "😊", "🥰", "👍"}
-        negative_emojis = {"😢", "😡", "💔", "😠", "😞"}
-
-        if any(remove_variation_selectors(e) in clean_text for e in positive_emojis):
+    # Handle emoji-only or short posts
+    if all(ch in EMOJI_DATA or ch.isspace() for ch in clean_text):
+        if any(e in clean_text for e in ["😍", "🥰", "❤️", "😂", "😊", "👍"]):
             return {"original": original_text, "translated": original_text, "label": "positive"}
-        if any(remove_variation_selectors(e) in clean_text for e in negative_emojis):
+        if any(e in clean_text for e in ["😢", "💔", "😠", "😡", "😞"]):
             return {"original": original_text, "translated": original_text, "label": "negative"}
         return {"original": original_text, "translated": original_text, "label": "neutral"}
 
-    # ---------- Emoji-heavy posts (>50%) ----------
-    emoji_ratio = sum(1 for ch in clean_text if ch in EMOJI_DATA) / len(clean_text)
-    if emoji_ratio > 0.5:
-        return {"original": original_text, "translated": original_text, "label": "positive"}
-
-    # ---------- Convert emojis to text for ML ----------
+    # Convert emojis to words
     processed_text = demojize(original_text)
-    if len(processed_text) < 4:
-        return {"original": original_text, "translated": processed_text, "label": "neutral"}
+    processed_text = processed_text.replace(":", " ").replace("_", " ")
 
-    translated_text = processed_text
-
-    # ---------- Language detection & translation ----------
+    # Detect language & translate if needed
     try:
         lang = detect(processed_text)
     except LangDetectException:
         lang = "en"
 
+    translated_text = processed_text
     if lang != "en":
         try:
             translated_text = translator.translate(processed_text, dest="en").text
         except Exception:
             translated_text = processed_text
 
-    # ---------- ML Sentiment Prediction ----------
+    # Run ML model
     label = "neutral"
     if method == "ml":
-        sentiment_model = insight_models.get_sentiment_model()
-        if sentiment_model:
+        sentiment_pipeline = insight_models.get_sentiment_model()
+        if sentiment_pipeline:
             try:
-                pred = sentiment_model.predict([translated_text])
-                pred_value = pred[0]
-                if isinstance(pred_value, str):
-                    label = pred_value.lower()
-                elif isinstance(pred_value, int):
-                    label = {0: "negative", 1: "neutral", 2: "positive"}.get(pred_value, "neutral")
+                pred = sentiment_pipeline(translated_text)
+                raw_label = pred[0]["label"]
+                score = pred[0]["score"]
+                mapped = map_sentiment_label(raw_label)
+                if score < 0.6:
+                    label = "neutral"
+                else:
+                    label = mapped
             except Exception as e:
                 logger.error(f"Sentiment model error: {e}")
 
     return {"original": original_text, "translated": translated_text, "label": label}
-
 
 # =========================
 # 📌 Extra Analysis Features
@@ -85,32 +78,16 @@ def mentions_location(text: str):
     if not text:
         return None
 
-    lowered = text.lower()
-    locations_model = insight_models.get_locations_model()
-    if locations_model:
-        try:
-            for entry in locations_model:
-                if isinstance(entry, (list, tuple)) and len(entry) >= 3:
-                    city, country = entry[1].lower(), entry[2].lower()
-                    if city in lowered:
-                        return entry[1]
-                    if country in lowered:
-                        return entry[2]
-                elif isinstance(entry, dict):
-                    city = entry.get("city", "").lower()
-                    country = entry.get("country", "").lower()
-                    if city and city in lowered:
-                        return entry["city"]
-                    if country and country in lowered:
-                        return entry["country"]
-        except Exception as e:
-            logger.error(f"Location model error: {e}")
+    entities = insight_models.extract_entities(text)
+    if entities.get("locations"):
+        return entities["locations"][0]  # return first detected location
 
     fallback_cities = [
         "colombo", "kandy", "galle", "jaffna", "batticaloa",
         "trincomalee", "negombo", "kurunegala", "anuradhapura",
         "ratnapura", "badulla", "matara"
     ]
+    lowered = text.lower()
     for city in fallback_cities:
         if city in lowered:
             return city.capitalize()
@@ -126,11 +103,13 @@ def is_toxic(text: str) -> bool:
     lowered = text.lower()
     keyword_match = any(word in lowered for word in toxic_keywords)
 
+    toxic_pipeline = insight_models.get_toxic_model()
     model_prediction = False
-    toxic_model = insight_models.get_toxic_model()
-    if toxic_model:
+    if toxic_pipeline:
         try:
-            model_prediction = bool(toxic_model.predict([text])[0])
+            pred = toxic_pipeline(text)
+            # HF returns [{'label': 'TOXIC', 'score': 0.95}]
+            model_prediction = pred[0]["label"].lower() == "toxic"
         except Exception as e:
             logger.error(f"Toxic model error: {e}")
 
@@ -144,35 +123,25 @@ def is_respectful(text: str) -> bool:
 def discloses_personal_info(text: str) -> bool:
     if not text:
         return False
-    email_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
-    phone_pattern = r"\b\d{10}\b"
-    return bool(re.search(email_pattern, text) or re.search(phone_pattern, text))
+    entities = insight_models.extract_entities(text)
+    return bool(entities.get("phones") or entities.get("emails"))
 
 
 def is_potential_misinformation(text: str) -> bool:
     if not text or text.strip() == "":
         return False
 
-    non_emoji_chars = sum(1 for ch in text if ch not in EMOJI_DATA and not ch.isspace())
-    if non_emoji_chars < 4:
-        return False
-
-    misinfo_model = insight_models.get_misinfo_model()
-    if not misinfo_model:
+    misinfo_pipeline = insight_models.get_misinfo_model()
+    if not misinfo_pipeline:
         return False
 
     try:
-        pred = misinfo_model.predict([text])[0]
-        if isinstance(pred, (int, float)):
-            return bool(round(pred))
-        if isinstance(pred, str):
-            return pred.lower() in ["true", "yes", "1", "misinfo", "misinformation"]
-        if isinstance(pred, (list, tuple)):
-            return pred[0] > 0.5
+        pred = misinfo_pipeline(text)
+        label = pred[0]["label"].lower()
+        return label in ["misinfo", "misinformation", "true", "yes", "1"]
     except Exception as e:
         logger.error(f"Misinfo model error: {e}")
-
-    return False
+        return False
 
 
 # =========================

@@ -25,7 +25,6 @@ SECRET_KEY = 'django-insecure-hlqa933e$&irs(+u9)&yemqba(y2!cjw56xy85suu^mv#+n*&x
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-CORS_ALLOW_ALL_ORIGINS = True
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 # Application definition
@@ -133,27 +132,28 @@ from decouple import config
 FB_APP_ID = config("FB_APP_ID")
 FB_APP_SECRET = config("FB_APP_SECRET")
 
-BASE_URL = "https://cyberhunk.onrender.com"       # Django backend URL
-FRONTEND_URL = "https://cyberhunk.vercel.app"   # React frontend URL
+BASE_URL = "https://spurtive-subtilely-earl.ngrok-free.dev"       # Django backend URL
+FRONTEND_URL = "https://cyberhunk.vercel.app/"   # React frontend URL
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False  
+
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # React frontend (local dev)
-    "https://cyberhunk.onrender.com",  # Render backend
-    "https://cyberhunk.vercel.app",  # Vercel frontend
+    "https://cyberhunk.vercel.app/",  # React frontend (local dev)
+    "https://spurtive-subtilely-earl.ngrok-free.dev",  # Render backend
 ]
 
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
-    "cyberhunk.onrender.com",
-    "cyberhunk.vercel.app", 
+    "spurtive-subtilely-earl.ngrok-free.dev",
+    "cyberhunk.vercel.app/", 
 ]
 
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://cyberhunk.vercel.app",
-    "https://cyberhunk.onrender.com",
+    "https://cyberhunk.vercel.app/",
+    "https://spurtive-subtilely-earl.ngrok-free.dev",
 ]
 
 SESSION_COOKIE_SAMESITE = "None"

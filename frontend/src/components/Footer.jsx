@@ -72,7 +72,7 @@ export default function Footer() {
       <div className="absolute top-20 right-10 w-60 h-60 bg-purple-400 rounded-full opacity-15 animate-pulse-slow blur-3xl"></div>
       <div className="absolute bottom-0 left-1/3 w-56 h-56 bg-indigo-500 rounded-full opacity-15 animate-pulse-slow blur-3xl"></div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 0.2; }
           50% { opacity: 0.5; }

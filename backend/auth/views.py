@@ -6,8 +6,8 @@ from urllib.parse import urlencode
 
 FACEBOOK_CLIENT_ID = settings.FB_APP_ID
 FACEBOOK_CLIENT_SECRET = settings.FB_APP_SECRET
-BASE_URL = settings.BASE_URL
-FRONTEND_URL = settings.FRONTEND_URL
+BASE_URL = settings.BASE_URL  # e.g. https://spurtive-subtilely-earl.ngrok-free.dev
+FRONTEND_URL = settings.FRONTEND_URL  # e.g. http://localhost:5173 or your deployed React site
 
 
 def facebook_login(request):
@@ -45,15 +45,5 @@ def facebook_callback(request):
     except requests.RequestException:
         return HttpResponse("Failed to get access token", status=400)
 
-    # ✅ Only here is response defined
-    response = redirect(f"{FRONTEND_URL}/dashboard")
-    response.set_cookie(
-        "fb_token",
-        access_token,
-        httponly=False,
-        max_age=3600 * 24 * 7,  # 7 days
-        samesite="Lax",
-        secure=(settings.BASE_URL.startswith("https://"))
-    )
-    return response
-
+    # ✅ Redirect with token in URL (frontend will set cookie)
+    return redirect(f"{FRONTEND_URL}/auth/callback?token={access_token}")

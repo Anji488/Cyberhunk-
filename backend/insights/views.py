@@ -3,6 +3,7 @@ import requests
 import logging
 from django.http import JsonResponse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from insights import hf_models as models  # Hugging Face models
 from insights.services import (
     analyze_text,
     is_respectful,
@@ -17,11 +18,13 @@ logger = logging.getLogger(__name__)
 
 MAX_THREADS = 5
 REQUEST_DELAY = 0.3
-DEFAULT_MAX_POSTS = 20
-MAX_COMMENTS = 20
+DEFAULT_MAX_POSTS = 100
+MAX_COMMENTS = 100
 MAX_NESTED = 5
 
+# -----------------------------
 # Helper functions
+# -----------------------------
 def safe_request(url: str) -> dict:
     time.sleep(REQUEST_DELAY)
     try:
@@ -44,7 +47,6 @@ def fetch_profile(token: str) -> dict:
     )
     return safe_request(url)
 
-
 def fetch_comments(post_id: str, token: str) -> list:
     comments = []
     next_url = f"https://graph.facebook.com/v19.0/{post_id}/comments?fields=message,created_time,comments&limit=20&access_token={token}"
@@ -63,7 +65,9 @@ def fetch_nested_comments(comment: dict, token: str) -> list:
             nested_comments.extend(fetch_nested_comments(nested, token))
     return nested_comments
 
+# -----------------------------
 # Main View
+# -----------------------------
 def analyze_facebook(request):
     token = request.GET.get("token") or request.COOKIES.get("fb_token")
     method = request.GET.get("method", "ml")
@@ -97,12 +101,16 @@ def analyze_facebook(request):
                     shared_cache[shared_id] = shared_message
                 content = shared_cache.get(shared_id, content)
 
+            # -----------------------------
+            # Analyze post with Hugging Face
+            # -----------------------------
             try:
                 analysis = analyze_text(content, method)
             except Exception as e:
                 logger.error(f"Sentiment analysis failed: {e}")
                 analysis = {"original": content, "translated": "", "label": "neutral"}
 
+            # Add extra features
             analysis.update({
                 "timestamp": post.get("created_time"),
                 "is_respectful": is_respectful(content),
@@ -116,6 +124,9 @@ def analyze_facebook(request):
 
             insights.append(analysis)
 
+            # -----------------------------
+            # Analyze comments concurrently
+            # -----------------------------
             top_comments = fetch_comments(post["id"], token)
             all_comments = []
             for c in top_comments:
@@ -148,7 +159,9 @@ def analyze_facebook(request):
 
         next_url = data.get("paging", {}).get("next")
 
+    # -----------------------------
     # Compute metrics and recommendations
+    # -----------------------------
     insightMetrics, recommendations = compute_insight_metrics(insights)
 
     return JsonResponse({

@@ -39,7 +39,7 @@ export default function ImpactSection() {
         ))}
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes gradient-neon {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
