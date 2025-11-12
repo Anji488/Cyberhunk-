@@ -139,7 +139,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False  
 
 CORS_ALLOWED_ORIGINS = [
-    "https://cyberhunk.vercel.app",  # React frontend (local dev)
+    "https://cyberhunk.vercel.app",  # React frontend 
     "https://cyberhunk.onrender.com",  # Render backend
 ]
 
@@ -155,6 +155,17 @@ CSRF_TRUSTED_ORIGINS = [
     "https://cyberhunk.vercel.app",
     "https://cyberhunk.onrender.com",
 ]
+
+CORS_ALLOW_HEADERS = [
+    'authorization',
+    'content-type',
+    'accept',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
 
 SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SECURE = True
