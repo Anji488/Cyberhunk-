@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 FACEBOOK_CLIENT_ID = settings.FB_APP_ID
 FACEBOOK_CLIENT_SECRET = settings.FB_APP_SECRET
-BASE_URL = settings.BASE_URL  # e.g. https://https://cyberhunk.onrender.com
+BASE_URL = settings.BASE_URL  # e.g. https://cyberhunk.onrender.com
 FRONTEND_URL = settings.FRONTEND_URL  # e.g. http://localhost:5173 or your deployed React site
 
 
