@@ -1,5 +1,9 @@
 import logging
+import os
 import re
+
+# ⚙️ Prevent heavy torchvision imports (Render memory saver)
+os.environ["TRANSFORMERS_NO_TORCHVISION_IMPORT"] = "1"
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +25,8 @@ def _load_pipeline(task, model, **kwargs):
     Keeps memory low on Render.
     """
     try:
-        from transformers import pipeline  # import only when needed
-        logger.info(f"Loading HF pipeline: {model}")
+        from transformers import pipeline  # Lazy import
+        logger.info(f"🚀 Loading HF pipeline: {model}")
         return pipeline(task, model=model, **kwargs)
     except Exception as e:
         logger.error(f"❌ Failed to load pipeline '{model}': {e}")
@@ -88,7 +92,9 @@ def get_ner_model():
     global _ner_model
     if _ner_model is None:
         _ner_model = _load_pipeline(
-            "token-classification", "dslim/bert-base-NER", aggregation_strategy="simple"
+            "token-classification",
+            "dslim/bert-base-NER",
+            aggregation_strategy="simple",
         )
     return _ner_model
 
@@ -115,6 +121,7 @@ def extract_entities(text: str):
         logger.error(f"NER extraction failed: {e}")
         locations = []
 
+    # Regex patterns for emails & phone numbers
     email_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
     phone_pattern = r"\b\d{10}\b"
 
