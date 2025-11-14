@@ -4,6 +4,5 @@ from . import views
 from .views import analyze_facebook
 
 urlpatterns = [
-    path('analyze', analyze_facebook),
      path('analyze/', analyze_facebook),
 ]
