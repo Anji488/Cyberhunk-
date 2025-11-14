@@ -1,11 +1,13 @@
+# insights/views.py
 import time
-import requests
 import logging
+import requests
 from django.http import JsonResponse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from insights import hf_models as models  # Hugging Face models
+from functools import lru_cache
+
+from insights.model_loader import nlp, sentiment_model
 from insights.services import (
-    analyze_text,
     is_respectful,
     mentions_location,
     discloses_personal_info,
@@ -16,14 +18,32 @@ from insights.services import (
 
 logger = logging.getLogger(__name__)
 
-MAX_THREADS = 5
+# -----------------------------
+# Configuration
+# -----------------------------
+MAX_THREADS = 3
 REQUEST_DELAY = 0.3
-DEFAULT_MAX_POSTS = 100
-MAX_COMMENTS = 100
-MAX_NESTED = 5
+DEFAULT_MAX_POSTS = 10
+MAX_COMMENTS = 20
+MAX_NESTED = 2
 
 # -----------------------------
-# Helper functions
+# Cached analysis
+# -----------------------------
+@lru_cache(maxsize=512)
+def analyze_text_cached(text: str):
+    if not text:
+        return {"original": "", "translated": "", "label": "neutral"}
+    try:
+        result = sentiment_model(text)
+        label = result[0]["label"].lower()
+    except Exception as e:
+        logger.error(f"Sentiment analysis failed: {e}")
+        label = "neutral"
+    return {"original": text, "translated": "", "label": label}
+
+# -----------------------------
+# Facebook API Helpers
 # -----------------------------
 def safe_request(url: str) -> dict:
     time.sleep(REQUEST_DELAY)
@@ -32,8 +52,6 @@ def safe_request(url: str) -> dict:
         res.raise_for_status()
         return res.json()
     except requests.exceptions.HTTPError as e:
-        if res.status_code == 400:
-            return {}
         logger.error(f"HTTP error: {url} -> {e}")
     except Exception as e:
         logger.error(f"Request failed: {url} -> {e}")
@@ -101,16 +119,7 @@ def analyze_facebook(request):
                     shared_cache[shared_id] = shared_message
                 content = shared_cache.get(shared_id, content)
 
-            # -----------------------------
-            # Analyze post with Hugging Face
-            # -----------------------------
-            try:
-                analysis = analyze_text(content, method)
-            except Exception as e:
-                logger.error(f"Sentiment analysis failed: {e}")
-                analysis = {"original": content, "translated": "", "label": "neutral"}
-
-            # Add extra features
+            analysis = analyze_text_cached(content)
             analysis.update({
                 "timestamp": post.get("created_time"),
                 "is_respectful": is_respectful(content),
@@ -121,7 +130,6 @@ def analyze_facebook(request):
                 "status_type": post.get("status_type"),
                 "type": "post"
             })
-
             insights.append(analysis)
 
             # -----------------------------
@@ -134,15 +142,10 @@ def analyze_facebook(request):
                 all_comments.extend(fetch_nested_comments(c, token))
 
             with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-                futures = {executor.submit(analyze_text, c.get("message", ""), method): c for c in all_comments}
+                futures = {executor.submit(analyze_text_cached, c.get("message", "")): c for c in all_comments}
                 for future in as_completed(futures):
                     c = futures[future]
-                    try:
-                        c_analysis = future.result()
-                    except Exception as e:
-                        logger.error(f"Comment analysis failed: {e}")
-                        c_analysis = {"original": c.get("message", ""), "translated": "", "label": "neutral"}
-
+                    c_analysis = future.result()
                     c_analysis.update({
                         "timestamp": c.get("created_time"),
                         "is_respectful": is_respectful(c.get("message", "")),
@@ -152,16 +155,12 @@ def analyze_facebook(request):
                         "misinformation_risk": is_potential_misinformation(c.get("message", "")),
                         "type": "comment"
                     })
-
                     insights.append(c_analysis)
 
             fetched_posts += 1
 
         next_url = data.get("paging", {}).get("next")
 
-    # -----------------------------
-    # Compute metrics and recommendations
-    # -----------------------------
     insightMetrics, recommendations = compute_insight_metrics(insights)
 
     return JsonResponse({
