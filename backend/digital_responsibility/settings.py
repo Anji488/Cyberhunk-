@@ -137,6 +137,11 @@ FRONTEND_URL = "https://cyberhunk.vercel.app"   # React frontend URL
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False  
+CORS_ALLOW_PRIVATE_NETWORK = True
+CORS_ALLOW_ALL_HEADERS = True
+CORS_EXPOSE_HEADERS = ["*"]
+
+APPEND_SLASH = False 
 
 CORS_ALLOWED_ORIGINS = [
     "https://cyberhunk.vercel.app",  # React frontend 
