@@ -5,12 +5,10 @@ from django.http import HttpResponse
 
 FACEBOOK_CLIENT_ID = settings.FB_APP_ID
 FACEBOOK_CLIENT_SECRET = settings.FB_APP_SECRET
-BASE_URL = settings.BASE_URL           # e.g., https://cyberhunk.onrender.com
-FRONTEND_URL = settings.FRONTEND_URL   # e.g., https://cyberhunk.vercel.app
+BASE_URL = settings.BASE_URL
+FRONTEND_URL = settings.FRONTEND_URL
 
-# Common redirect URI for Facebook
 REDIRECT_URI = f"{BASE_URL}/auth/facebook/callback/"
-
 
 def facebook_login(request):
     """Redirect user to Facebook OAuth login page."""
@@ -49,14 +47,5 @@ def facebook_callback(request):
     except requests.RequestException as e:
         return HttpResponse(f"Failed to get access token: {e}", status=400)
 
-    # ✅ Redirect with token set as secure, HTTP-only cookie
-    response = redirect(f"{FRONTEND_URL}/auth/callback")
-    response.set_cookie(
-        "fb_token",
-        access_token,
-        httponly=True,
-        secure=True,
-        samesite="None",
-        max_age=60 * 60 * 2,  # 2 hours
-    )
-    return response
+    # Redirect to frontend with token in URL
+    return redirect(f"{FRONTEND_URL}/auth/callback?token={access_token}")

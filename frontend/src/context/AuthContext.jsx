@@ -1,4 +1,3 @@
-// File: src/context/AuthContext.jsx
 import React, { createContext, useState, useEffect } from "react";
 import Cookies from "js-cookie";
 
@@ -13,13 +12,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const updateToken = (newToken) => {
-    Cookies.set("fb_token", newToken, { expires: 1 }); // 1 day
+    Cookies.set("fb_token", newToken, { expires: 7, sameSite: "Lax", secure: true });
     setToken(newToken);
   };
 
   const clearToken = () => {
     Cookies.remove("fb_token");
-    Cookies.remove("fb_insights"); // optional: clear cached insights
+    Cookies.remove("fb_insights");
     setToken(null);
   };
 

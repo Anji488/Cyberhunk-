@@ -139,8 +139,8 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False  
 
 CORS_ALLOWED_ORIGINS = [
-    "https://cyberhunk.vercel.app",  # React frontend 
-    "https://cyberhunk.onrender.com",  # Render backend
+    FRONTEND_URL,
+    BASE_URL,
 ]
 
 ALLOWED_HOSTS = [
@@ -152,8 +152,8 @@ ALLOWED_HOSTS = [
 
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://cyberhunk.vercel.app",
-    "https://cyberhunk.onrender.com",
+    FRONTEND_URL,
+    BASE_URL,
 ]
 
 CORS_ALLOW_HEADERS = [
