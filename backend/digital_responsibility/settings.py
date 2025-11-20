@@ -139,6 +139,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "https://cyberhunk.vercel.app",
     "http://localhost:3000",  # for local dev
+    "https://cyberhunk.onrender.com" 
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -148,7 +149,7 @@ CORS_ALLOWED_ORIGINS = [
 
 CSRF_TRUSTED_ORIGINS = [
     "https://cyberhunk.vercel.app",
-    "https://cyberhunk.vercel.app"
+    "https://cyberhunk.onrender.com"
 ]
 
 ALLOWED_HOSTS = [
