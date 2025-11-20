@@ -137,7 +137,7 @@ FRONTEND_URL = "https://cyberhunk.vercel.app"   # React frontend URL
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "https://your-nextjs-app.vercel.app",
+    "https://cyberhunk.vercel.app",
     "http://localhost:3000",  # for local dev
 ]
 
@@ -155,8 +155,8 @@ ALLOWED_HOSTS = [
 
 
 CSRF_TRUSTED_ORIGINS = [
-    FRONTEND_URL,
-    BASE_URL,
+    "https://cyberhunk.vercel.app",
+    "http://localhost:3000",
 ]
 
 CORS_ALLOW_HEADERS = [
