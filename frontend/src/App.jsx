@@ -11,6 +11,7 @@ import NotFound from "@/pages/NotFound";
 import Layout from "@/components/Layout";
 import AuthCallback from "@/pages/AuthCallback";
 import { InsightsProvider } from "@/context/InsightsContext";
+import { AuthProvider } from "@/context/AuthContext"; 
 
 import About from "@/pages/About";
 import Features from "@/pages/Features";
@@ -44,6 +45,7 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
+    <AuthProvider>
       <InsightsProvider>
         <Routes>
           <Route path="/" element={<Layout><Home /></Layout>} />
@@ -62,5 +64,6 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </InsightsProvider>
+    </AuthProvider>
   );
 }

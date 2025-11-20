@@ -11,21 +11,25 @@ export default function AuthCallback() {
   const { updateToken } = useContext(AuthContext);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tokenFromUrl = params.get("token");
+  // Clean fragment (#_=_)
+  if (window.location.hash && window.location.hash === "#_=_") {
+    window.history.replaceState(null, null, window.location.pathname + window.location.search);
+  }
 
-    if (tokenFromUrl) {
-      updateToken(tokenFromUrl);
+  const params = new URLSearchParams(window.location.search);
+  const tokenFromUrl = params.get("token");
 
-      // remove token from URL
-      window.history.replaceState({}, document.title, "/dashboard");
+  if (tokenFromUrl) {
+    updateToken(tokenFromUrl);
 
-      navigate("/dashboard", { replace: true });
-    } else {
-      setStatus("failed");
-      setTimeout(() => navigate("/login", { replace: true }), 2000);
-    }
-  }, [navigate, updateToken]);
+    // redirect after context is updated
+    setTimeout(() => navigate("/dashboard", { replace: true }), 100); 
+  } else {
+    setStatus("failed");
+    setTimeout(() => navigate("/login", { replace: true }), 2000);
+  }
+}, [navigate, updateToken]);
+
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-950 text-gray-200">
