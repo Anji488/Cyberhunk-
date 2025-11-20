@@ -136,7 +136,10 @@ BASE_URL = "https://cyberhunk.onrender.com"       # Django backend URL
 FRONTEND_URL = "https://cyberhunk.vercel.app"   # React frontend URL
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False  
+CORS_ALLOWED_ORIGINS = [
+    "https://your-nextjs-app.vercel.app",
+    "http://localhost:3000",  # for local dev
+]
 
 CORS_ALLOWED_ORIGINS = [
     FRONTEND_URL,
