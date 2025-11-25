@@ -4,6 +4,13 @@ import logging
 from django.http import JsonResponse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from insights import hf_models as models  # Hugging Face models
+
+import uuid
+import json
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from .mongo_client import reports_collection
+
 from insights.services import (
     analyze_text,
     is_respectful,
@@ -170,3 +177,41 @@ def analyze_facebook(request):
         "insightMetrics": insightMetrics,
         "recommendations": recommendations
     })
+
+@csrf_exempt
+@login_required
+def request_report(request):
+    from .tasks import generate_report  # move import here
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    token = data.get("token")
+    method = data.get("method", "ml")
+    max_posts = int(data.get("max_posts", 100))
+
+    if not token:
+        return JsonResponse({"error": "Token required"}, status=400)
+
+    report_id = str(uuid.uuid4())
+    generate_report.delay(report_id, token, method, max_posts, user_id=request.user.id)
+
+    return JsonResponse({"report_id": report_id, "status": "pending"})
+
+@login_required
+def get_reports(request):
+    user_id = str(request.user.id)
+    reports = list(reports_collection.find({"user_id": user_id}).sort("created_at", -1))
+    for r in reports:
+        r["_id"] = str(r["_id"])
+    return JsonResponse({"reports": reports})
+
+@login_required
+def get_report(request, report_id):
+    report = reports_collection.find_one({"report_id": report_id, "user_id": str(request.user.id)})
+    if not report:
+        return JsonResponse({"error": "Report not found"}, status=404)
+    report["_id"] = str(report["_id"])
+    return JsonResponse(report)

@@ -1,11 +1,13 @@
 import logging
 import os
 import re
+from transformers.utils import logging as hf_logging
 
 # ⚙️ Prevent heavy torchvision imports (Render memory saver)
 os.environ["TRANSFORMERS_NO_TORCHVISION_IMPORT"] = "1"
 
 logger = logging.getLogger(__name__)
+hf_logging.set_verbosity_error()
 
 # -----------------------------
 # Cached pipelines
@@ -22,16 +24,30 @@ _ner_model = None
 def _load_pipeline(task, model, **kwargs):
     """
     Lazy-load a Hugging Face pipeline only when needed.
-    Keeps memory low on Render.
+    Ensures CPU compatibility and avoids meta tensor issues.
     """
     try:
-        from transformers import pipeline  # Lazy import
+        from transformers import pipeline, AutoModelForTokenClassification, AutoModelForSequenceClassification, AutoTokenizer
+        import torch
+
         logger.info(f"🚀 Loading HF pipeline: {model}")
-        return pipeline(task, model=model, **kwargs)
+
+        device = -1  # CPU
+        dtype = torch.float32  # avoid meta tensors
+
+        # Special handling for token-classification pipelines
+        if task == "token-classification":
+            model_obj = AutoModelForTokenClassification.from_pretrained(
+                model, dtype=dtype, device_map={"": "cpu"}
+            )
+            tokenizer = AutoTokenizer.from_pretrained(model)
+            return pipeline(task, model=model_obj, tokenizer=tokenizer, **kwargs)
+        else:
+            return pipeline(task, model=model, device=device, **kwargs)
+
     except Exception as e:
         logger.error(f"❌ Failed to load pipeline '{model}': {e}")
         return None
-
 
 # -----------------------------
 # Sentiment model
