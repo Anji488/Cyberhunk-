@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CyberHunk Backend</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0d1117, #161b22);
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+      text-align: center;
+    }
+
+    .circle {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(56, 133, 255, 0.15);
+      animation: float 10s infinite ease-in-out;
+      z-index: 0;
+    }
+    .circle:nth-child(1) { width: 200px; height: 200px; top: 10%; left: 15%; animation-duration: 12s; }
+    .circle:nth-child(2) { width: 300px; height: 300px; top: 40%; left: 60%; animation-duration: 18s; }
+    .circle:nth-child(3) { width: 150px; height: 150px; top: 70%; left: 25%; animation-duration: 15s; }
+
+    @keyframes float {
+      0% { transform: translateY(0) translateX(0); }
+      50% { transform: translateY(-20px) translateX(15px); }
+      100% { transform: translateY(0) translateX(0); }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 600px;
+      padding: 2rem;
+      background: rgba(24, 27, 33, 0.7);
+      border-radius: 16px;
+      box-shadow: 0 0 30px rgba(56,133,255,0.2);
+      animation: fadeIn 1.5s ease-out forwards;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      color: rgb(238, 240, 243);
+      text-shadow: 0 0 10px #38f, 0 0 20px #38f;
+    }
+
+    p {
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+      color: #aaa;
+    }
+
+    a.button {
+      display: inline-block;
+      background: linear-gradient(135deg, #238636, #2ea043);
+      padding: 0.8rem 2rem;
+      border-radius: 12px;
+      font-weight: bold;
+      text-decoration: none;
+      color: #fff;
+      font-size: 1.1rem;
+      transition: all 0.3s ease;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    a.button:hover {
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+
+    .credits {
+      position: absolute;
+      bottom: 15px;
+      font-size: 0.9rem;
+      color: #555;
+      text-align: center;
+      width: 100%;
+    }
+
+    @keyframes fadeIn {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="circle"></div>
+  <div class="circle"></div>
+  <div class="circle"></div>
+
+  <div class="container">
+    <h1>⚡ CyberHunk Backend Live!</h1>
+    <p>CyberHunk Django backend is running smoothly. Click below to access the frontend app.</p>
+    <a class="button" href="http://localhost:3000/">Go to Frontend</a>
+  </div>
+
+  <div class="credits">
+    anjanie wijayaratne &nbsp;|&nbsp; 2025 &nbsp;|&nbsp; CyberHunk
+  </div>
+</body>
+</html>

@@ -11,15 +11,13 @@ import NotFound from "@/pages/NotFound";
 import Layout from "@/components/Layout";
 import AuthCallback from "@/pages/AuthCallback";
 import { InsightsProvider } from "@/context/InsightsContext";
-
+import { AuthProvider } from "@/context/AuthContext"; 
 
 import About from "@/pages/About";
 import Features from "@/pages/Features";
 import Framework from "@/pages/OurFramework";
 import PrivacyPolicy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
-// import Contact from "@/pages/Contact";
-// import Articles from "@/pages/Articles";
 
 function LoadingScreen() {
   return (
@@ -47,7 +45,7 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <Router>
+    <AuthProvider>
       <InsightsProvider>
         <Routes>
           <Route path="/" element={<Layout><Home /></Layout>} />
@@ -58,39 +56,14 @@ export default function App() {
           <Route path="/our-framework" element={<Layout><Framework /></Layout>} />
           <Route path="/terms" element={<Layout><Terms /></Layout>} />
           <Route path="/privacy-policy" element={<Layout><PrivacyPolicy /></Layout>} />
-          {/*<Route path="/contact" element={<Layout><Contact /></Layout>} />
-          <Route path="/articles" element={<Layout><Articles /></Layout>} />
-           */}
-          
 
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Layout><DashboardPage /></Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/charts"
-            element={
-              <ProtectedRoute>
-                <Layout><ChartsPage /></Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/posts"
-            element={
-              <ProtectedRoute>
-                <Layout><PostsPage /></Layout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/dashboard" element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>} />
+          <Route path="/charts" element={<ProtectedRoute><Layout><ChartsPage /></Layout></ProtectedRoute>} />
+          <Route path="/posts" element={<ProtectedRoute><Layout><PostsPage /></Layout></ProtectedRoute>} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>
       </InsightsProvider>
-    </Router>
+    </AuthProvider>
   );
 }

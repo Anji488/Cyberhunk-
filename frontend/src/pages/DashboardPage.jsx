@@ -21,6 +21,11 @@ export default function DashboardPage() {
 
   const total = insights.length || 1;
   const token = Cookies.get("fb_token");
+  if (!token) {
+    navigate("/login");
+    return null;
+  }
+
 
   const score = insightMetrics.reduce((sum, m) => sum + m.value, 0) / (insightMetrics.length || 1);
   let bannerText = "Good Digital Behavior";

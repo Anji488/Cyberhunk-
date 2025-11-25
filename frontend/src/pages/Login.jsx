@@ -5,6 +5,7 @@ import { Sun, BookOpen, Globe } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Login() {
+  const BACKEND_URL = "http://localhost:8000";
   return (
     <div className="min-h-screen relative bg-white font-sans overflow-hidden flex flex-col items-center justify-start py-20 px-6 md:px-20">
 
@@ -61,17 +62,18 @@ export default function Login() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1, delay: 0.6 }}
       >
-        <a href="http://localhost:8000/auth/facebook">
+        <a href={`${BACKEND_URL}/auth/facebook`}>
           <button className="group relative bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 shadow-lg text-lg flex items-center justify-center overflow-hidden">
             <span className="absolute left-0 w-12 h-12 bg-white/10 rounded-full transform scale-0 group-hover:scale-150 transition-transform duration-700 ease-out" />
             <FaFacebookF className="mr-3 text-xl z-10" />
             <span className="z-10">Take the Test with Facebook</span>
           </button>
         </a>
+
       </motion.div>
 
       {/* Animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes gradient-neon {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }

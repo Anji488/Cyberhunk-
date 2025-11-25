@@ -160,3 +160,4 @@ backend/ml_models/models/sentiment/safetensors.zip
 backend/ml_models/models/sentiment/*.safetensors
 backend/ml_models/models/sentiment/*.zip
 backend/ml_models/models/sentiment/checkpoint-*
+.vercel

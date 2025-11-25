@@ -1,28 +1,24 @@
-import os
-import joblib
-import logging
-from django.conf import settings
+# backend/insights/models.py
 
-logger = logging.getLogger(__name__)
+from django.db import models
 
-# Path to models directory
-MODEL_PATH = os.path.join(settings.BASE_DIR, "ml_models")
+class PostInsight(models.Model):
+    post_id = models.CharField(max_length=200, unique=True)
+    user_id = models.CharField(max_length=200)
+    original_text = models.TextField()
+    translated_text = models.TextField(blank=True, null=True)
+    sentiment = models.CharField(max_length=50, default="neutral")
+    is_respectful = models.BooleanField(default=True)
+    mentions_location = models.CharField(max_length=200, blank=True, null=True)
+    privacy_disclosure = models.BooleanField(default=False)
+    toxic = models.BooleanField(default=False)
+    misinformation_risk = models.BooleanField(default=False)
+    status_type = models.CharField(max_length=50, blank=True, null=True)
+    timestamp = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
-def load_model(filename):
-    path = os.path.join(MODEL_PATH, filename)
-    if not os.path.exists(path):
-        logger.warning(f"Model file not found: {filename}")
-        return None
-    try:
-        model = joblib.load(path)
-        logger.info(f"Loaded model: {filename}")
-        return model
-    except Exception as e:
-        logger.error(f"Failed to load model {filename}: {e}")
-        return None
+    class Meta:
+        ordering = ["-timestamp"]
 
-# Load models once at startup
-sentiment_model = load_model("sentiment_dataset_model.pkl")
-toxic_model = load_model("toxic_model.pkl")
-misinfo_model = load_model("misinformations_model.pkl")
-locations_model = load_model("locations_model.pkl")
+    def __str__(self):
+        return f"{self.post_id} - {self.sentiment}"

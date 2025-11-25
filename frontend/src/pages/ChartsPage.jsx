@@ -11,6 +11,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler
 } from "chart.js";
 import { motion } from "framer-motion";
 import { useInsights } from "@/context/InsightsContext";
@@ -24,7 +25,8 @@ ChartJS.register(
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler 
 );
 
 export default function ChartsPage() {

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Cookies from "js-cookie";
@@ -7,6 +8,8 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
   const [insights, setInsights] = useState([]);
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState(null);
+
+  const BACKEND_URL = "http://localhost:8000";
 
   useEffect(() => {
     const token = propToken || Cookies.get("fb_token");
@@ -18,61 +21,101 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
 
     const fetchData = async () => {
       setLoading(true);
+
       try {
-        // 1️⃣ Check if cached data exists
         const cachedData = Cookies.get("fb_insights");
         if (cachedData) {
           const parsed = JSON.parse(cachedData);
+          console.log("✅ Using cached insights data:", parsed); 
           setProfile(parsed.profile || null);
           setInsights(parsed.insights || []);
+          
           if (onInsightsFetched) onInsightsFetched(parsed);
+          
           setLoading(false);
-          return; // already loaded from cache
+          return;
         }
+      } catch (e) {
+        console.warn("Malformed fb_insights cookie found. Clearing cookie and fetching new data.", e);
+        Cookies.remove("fb_insights"); 
+      }
 
-        // 2️⃣ Fetch insights from backend (includes profile, metrics, recommendations)
+      try {
+        
         const res = await axios.get(
-          `http://localhost:8000/insights/analyze/?token=${token}&method=${method}`,
-          { withCredentials: true }
+          `${BACKEND_URL}/insights/analyze`,
+          {
+            params: { token, method },
+            headers: {
+                'Accept': 'application/json',
+            },
+            responseType: "json",
+            validateStatus: (status) => status < 500,
+          }
         );
 
-        const { profile: profileData, insights: fetchedInsights } = res.data;
-        setProfile(profileData);
-        setInsights(fetchedInsights || []);
+        console.log("✅ Raw backend response:", res.data);
 
-        // Prepare data for caching
-        const totalPosts = fetchedInsights.filter(i => i.type === "post").length;
-        const totalComments = fetchedInsights.filter(i => i.type === "comment").length;
+        if (!res.data || typeof res.data !== "object" || (typeof res.data === 'string' && res.data.includes("ngrok"))) {
+          console.error("❌ Response is not JSON (likely ngrok interstitial or server error):", res.data);
+          throw new Error("NGROK_ISSUE"); 
+        }
+
+        const profileData = res.data?.profile || null;
+        const fetchedInsights = Array.isArray(res.data?.insights) ? res.data.insights : [];
+
+        setProfile(profileData);
+        setInsights(fetchedInsights);
+
+        const totalPosts = fetchedInsights.filter(i => i?.type === "post").length;
+        const totalComments = fetchedInsights.filter(i => i?.type === "comment").length; 
 
         const finalData = {
           profile: profileData,
           insights: fetchedInsights,
           totalPosts,
           totalComments,
-          insightMetrics: res.data.insightMetrics || [],
-          recommendations: res.data.recommendations || []
+          insightMetrics: res.data?.insightMetrics || [],
+          recommendations: res.data?.recommendations || []
         };
 
-        Cookies.set("fb_insights", JSON.stringify(finalData), { expires: 1 }); // 1 day
+        console.log("✅ Processed insights data (finalData):", finalData);
+
+        Cookies.set("fb_insights", JSON.stringify(finalData), {
+          expires: 1, 
+          sameSite: "Lax",
+          secure: window.location.protocol === "https:",
+        });
 
         if (onInsightsFetched) onInsightsFetched(finalData);
 
       } catch (err) {
-        console.error("Failed to fetch or analyze token", err);
-        setError("Failed to fetch or analyze Facebook data.");
+        console.error("❌ Token analysis failed:", err);
+        setError(
+          err.message.includes("NGROK_ISSUE")
+            ? err.message
+            : "Failed to fetch or analyze Facebook data. Check your network or token."
+        );
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [method, propToken, onInsightsFetched]);
+  }, [method, propToken, onInsightsFetched]); 
 
-  if (loading) return <p className="text-gray-600">Analyzing token...</p>;
-  if (error) return <p className="text-red-500">{error}</p>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-indigo-500 border-opacity-75"></div>
+        <span className="ml-3 text-gray-400">Analyzing token...</span>
+      </div>
+    );
+  }
+
+  if (error) return <p className="text-red-500 font-medium p-4">{error}</p>;
   if (!profile) return null;
 
-  // Display profile: left picture, right details
   return (
     <div className="flex items-center bg-gray-900 p-4 rounded-lg border border-gray-700 mb-6">
       <img
