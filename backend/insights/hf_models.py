@@ -2,7 +2,6 @@ import logging
 import os
 import re
 from transformers.utils import logging as hf_logging
-
 # ⚙️ Prevent heavy torchvision imports (Render memory saver)
 os.environ["TRANSFORMERS_NO_TORCHVISION_IMPORT"] = "1"
 
@@ -27,27 +26,28 @@ def _load_pipeline(task, model, **kwargs):
     Ensures CPU compatibility and avoids meta tensor issues.
     """
     try:
-        from transformers import pipeline, AutoModelForTokenClassification, AutoModelForSequenceClassification, AutoTokenizer
+        from transformers import pipeline, AutoModelForTokenClassification, AutoTokenizer
         import torch
 
         logger.info(f"🚀 Loading HF pipeline: {model}")
 
-        device = -1  # CPU
-        dtype = torch.float32  # avoid meta tensors
-
         # Special handling for token-classification pipelines
         if task == "token-classification":
             model_obj = AutoModelForTokenClassification.from_pretrained(
-                model, dtype=dtype, device_map={"": "cpu"}
+                model,
+                torch_dtype=torch.float32,
+                device_map=None  # Load directly on CPU
             )
             tokenizer = AutoTokenizer.from_pretrained(model)
             return pipeline(task, model=model_obj, tokenizer=tokenizer, **kwargs)
         else:
-            return pipeline(task, model=model, device=device, **kwargs)
+            # For text-classification & sentiment models
+            return pipeline(task, model=model, device=-1, **kwargs)
 
     except Exception as e:
         logger.error(f"❌ Failed to load pipeline '{model}': {e}")
         return None
+
 
 # -----------------------------
 # Sentiment model

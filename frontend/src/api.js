@@ -1,5 +1,5 @@
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://cyberhunk.onrender.com";
 
 export async function fetchPosts() {
     const res = await fetch(`${API_URL}/posts/`);
