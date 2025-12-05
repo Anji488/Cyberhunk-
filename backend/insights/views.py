@@ -108,16 +108,12 @@ def analyze_facebook(request):
                     shared_cache[shared_id] = shared_message
                 content = shared_cache.get(shared_id, content)
 
-            # -----------------------------
-            # Analyze post with Hugging Face
-            # -----------------------------
             try:
                 analysis = analyze_text(content, method)
             except Exception as e:
                 logger.error(f"Sentiment analysis failed: {e}")
                 analysis = {"original": content, "translated": "", "label": "neutral"}
 
-            # Add extra features
             analysis.update({
                 "timestamp": post.get("created_time"),
                 "is_respectful": is_respectful(content),
@@ -131,9 +127,6 @@ def analyze_facebook(request):
 
             insights.append(analysis)
 
-            # -----------------------------
-            # Analyze comments concurrently
-            # -----------------------------
             top_comments = fetch_comments(post["id"], token)
             all_comments = []
             for c in top_comments:
@@ -167,21 +160,45 @@ def analyze_facebook(request):
         next_url = data.get("paging", {}).get("next")
 
     # -----------------------------
-    # Compute metrics and recommendations
+    # Compute metrics
     # -----------------------------
     insightMetrics, recommendations = compute_insight_metrics(insights)
 
+    # =====================================================
+    # AUTO-SAVE REPORT TO MONGODB
+    # =====================================================
+    report_id = str(uuid.uuid4())
+
+    report_doc = {
+        "report_id": report_id,
+        "user_id": str(request.user.id) if request.user.is_authenticated else "guest",
+        "profile": profile_data,
+        "insights": insights,
+        "insightMetrics": insightMetrics,
+        "recommendations": recommendations,
+        "created_at": time.time()
+    }
+
+    reports_collection.insert_one(report_doc)
+
+    # -----------------------------
+    # Return response with report_id
+    # -----------------------------
     return JsonResponse({
+        "report_id": report_id,
         "profile": profile_data,
         "insights": insights,
         "insightMetrics": insightMetrics,
         "recommendations": recommendations
     })
 
+
+# -----------------------------
+# Saved Reports Endpoints
+# -----------------------------
 @csrf_exempt
-@login_required
 def request_report(request):
-    from .tasks import generate_report  # move import here
+    from .tasks import generate_report
 
     try:
         data = json.loads(request.body)
@@ -200,18 +217,26 @@ def request_report(request):
 
     return JsonResponse({"report_id": report_id, "status": "pending"})
 
-@login_required
+
+@csrf_exempt
 def get_reports(request):
-    user_id = str(request.user.id)
-    reports = list(reports_collection.find({"user_id": user_id}).sort("created_at", -1))
+    user_id = str(request.user.id)  
+    profile_id = request.GET.get("profile_id")
+
+    query = {"user_id": user_id}
+    if profile_id:
+        query["profile.id"] = profile_id
+
+    reports = list(reports_collection.find(query).sort("created_at", -1))
     for r in reports:
         r["_id"] = str(r["_id"])
     return JsonResponse({"reports": reports})
 
-@login_required
+@csrf_exempt
 def get_report(request, report_id):
-    report = reports_collection.find_one({"report_id": report_id, "user_id": str(request.user.id)})
+    report = reports_collection.find_one({"report_id": report_id})
     if not report:
         return JsonResponse({"error": "Report not found"}, status=404)
+
     report["_id"] = str(report["_id"])
     return JsonResponse(report)

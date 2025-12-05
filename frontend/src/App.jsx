@@ -7,11 +7,15 @@ import Home from "@/pages/Home";
 import DashboardPage from "@/pages/DashboardPage";
 import ChartsPage from "@/pages/ChartsPage";
 import PostsPage from "@/pages/PostsPage";
+import ProfilePage from "@/pages/Profile";
+
 import NotFound from "@/pages/NotFound";
 import Layout from "@/components/Layout";
 import AuthCallback from "@/pages/AuthCallback";
 import { InsightsProvider } from "@/context/InsightsContext";
 import { AuthProvider } from "@/context/AuthContext"; 
+
+import Reports from "./pages/Reports";
 
 import About from "@/pages/About";
 import Features from "@/pages/Features";
@@ -60,7 +64,8 @@ export default function App() {
           <Route path="/dashboard" element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>} />
           <Route path="/charts" element={<ProtectedRoute><Layout><ChartsPage /></Layout></ProtectedRoute>} />
           <Route path="/posts" element={<ProtectedRoute><Layout><PostsPage /></Layout></ProtectedRoute>} />
-
+          <Route path="/profile" element={<ProtectedRoute><Layout><ProfilePage /></Layout></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><Layout><Reports/></Layout></ProtectedRoute>}/>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </InsightsProvider>
