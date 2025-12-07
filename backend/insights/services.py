@@ -10,7 +10,8 @@ from datetime import datetime
 import pytz
 
 logger = logging.getLogger(__name__)
-translator = Translator()
+# ❌ REMOVED: translator = Translator()   # This was breaking Render
+
 
 # =========================
 # 📌 NLP Analysis Functions
@@ -39,17 +40,23 @@ def analyze_text(text: str, method="ml") -> dict:
     processed_text = demojize(original_text)
     processed_text = processed_text.replace(":", " ").replace("_", " ")
 
-    # Detect language & translate if needed
+    # Detect language
     try:
         lang = detect(processed_text)
     except LangDetectException:
         lang = "en"
 
     translated_text = processed_text
+
+    # =======================
+    # FIXED: Safe Translator()
+    # =======================
     if lang != "en":
         try:
+            translator = Translator()   # now created safely inside function
             translated_text = translator.translate(processed_text, dest="en").text
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Translation failed: {e}")
             translated_text = processed_text
 
     # Run ML model
@@ -71,6 +78,7 @@ def analyze_text(text: str, method="ml") -> dict:
 
     return {"original": original_text, "translated": translated_text, "label": label}
 
+
 # =========================
 # 📌 Extra Analysis Features
 # =========================
@@ -80,7 +88,7 @@ def mentions_location(text: str):
 
     entities = insight_models.extract_entities(text)
     if entities.get("locations"):
-        return entities["locations"][0]  # return first detected location
+        return entities["locations"][0]
 
     fallback_cities = [
         "colombo", "kandy", "galle", "jaffna", "batticaloa",
@@ -108,7 +116,6 @@ def is_toxic(text: str) -> bool:
     if toxic_pipeline:
         try:
             pred = toxic_pipeline(text)
-            # HF returns [{'label': 'TOXIC', 'score': 0.95}]
             model_prediction = pred[0]["label"].lower() == "toxic"
         except Exception as e:
             logger.error(f"Toxic model error: {e}")
