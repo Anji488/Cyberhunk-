@@ -2,7 +2,7 @@ import re
 import logging
 import random
 from langdetect import detect, LangDetectException
-from googletrans import Translator
+# googletrans is imported lazily inside analyze_text to avoid import-time network calls
 from insights import hf_models as insight_models  # Use Hugging Face models
 from insights.hf_models import map_sentiment_label
 from emoji import demojize, EMOJI_DATA  # For emoji detection
@@ -10,7 +10,7 @@ from datetime import datetime
 import pytz
 
 logger = logging.getLogger(__name__)
-# ❌ REMOVED: translator = Translator()   # This was breaking Render
+# translator global removed to avoid import-time async client creation
 
 
 # =========================
@@ -49,14 +49,16 @@ def analyze_text(text: str, method="ml") -> dict:
     translated_text = processed_text
 
     # =======================
-    # FIXED: Safe Translator()
+    # Safe and lazy Translator usage
     # =======================
     if lang != "en":
         try:
-            translator = Translator()   # now created safely inside function
+            # Import Translator lazily to avoid import-time network setup
+            from googletrans import Translator
+            translator = Translator()
             translated_text = translator.translate(processed_text, dest="en").text
         except Exception as e:
-            logger.warning(f"Translation failed: {e}")
+            logger.warning(f"Translation failed (falling back to original): {e}")
             translated_text = processed_text
 
     # Run ML model
@@ -66,8 +68,8 @@ def analyze_text(text: str, method="ml") -> dict:
         if sentiment_pipeline:
             try:
                 pred = sentiment_pipeline(translated_text)
-                raw_label = pred[0]["label"]
-                score = pred[0]["score"]
+                raw_label = pred[0].get("label", "")
+                score = pred[0].get("score", 0)
                 mapped = map_sentiment_label(raw_label)
                 if score < 0.6:
                     label = "neutral"
@@ -116,7 +118,8 @@ def is_toxic(text: str) -> bool:
     if toxic_pipeline:
         try:
             pred = toxic_pipeline(text)
-            model_prediction = pred[0]["label"].lower() == "toxic"
+            if isinstance(pred, list) and len(pred) > 0:
+                model_prediction = str(pred[0].get("label", "")).lower() == "toxic"
         except Exception as e:
             logger.error(f"Toxic model error: {e}")
 
@@ -144,11 +147,12 @@ def is_potential_misinformation(text: str) -> bool:
 
     try:
         pred = misinfo_pipeline(text)
-        label = pred[0]["label"].lower()
-        return label in ["misinfo", "misinformation", "true", "yes", "1"]
+        if isinstance(pred, list) and len(pred) > 0:
+            label = str(pred[0].get("label", "")).lower()
+            return label in ["misinfo", "misinformation", "true", "yes", "1"]
     except Exception as e:
         logger.error(f"Misinfo model error: {e}")
-        return False
+    return False
 
 
 # =========================
@@ -178,7 +182,7 @@ def compute_insight_metrics(insights: list):
                 if hour >= 23 or hour < 6:
                     night_posts += 1
             except Exception as e:
-                logger.warning(f"Invalid timestamp format: {item['timestamp']} ({e})")
+                logger.warning(f"Invalid timestamp format: {item.get('timestamp')} ({e})")
 
         if item.get("mentions_location"):
             location_mentions += 1

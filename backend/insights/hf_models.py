@@ -24,8 +24,16 @@ def _load_pipeline(task, model, **kwargs):
     Prevents Render from crashing on startup.
     """
     try:
+        # Import heavy libraries lazily
         from transformers import pipeline, AutoModelForTokenClassification, AutoTokenizer
+        from transformers.utils import logging as hf_logging
         import torch
+
+        # reduce transformers verbosity when loaded
+        try:
+            hf_logging.set_verbosity_error()
+        except Exception:
+            pass
 
         logger.info(f"🚀 Loading HF pipeline: {model}")
 
@@ -33,7 +41,7 @@ def _load_pipeline(task, model, **kwargs):
         if task == "token-classification":
             model_obj = AutoModelForTokenClassification.from_pretrained(
                 model,
-                torch_dtype=torch.float32,
+                torch_dtype=getattr(torch, "float32", None),
                 device_map=None  # CPU-only
             )
             tokenizer = AutoTokenizer.from_pretrained(model)
@@ -126,7 +134,7 @@ def extract_entities(text: str):
     try:
         entities = ner(text)
         locations = [
-            e["word"]
+            e.get("word") or e.get("entity") or ""
             for e in entities
             if e.get("entity_group") in ["LOC", "GPE"]
         ]
@@ -138,7 +146,7 @@ def extract_entities(text: str):
     email_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
     phone_pattern = r"\b\d{10}\b"
 
-    emails = re.findall(email_pattern, text)
-    phones = re.findall(phone_pattern, text)
+    emails = re.findall(email_pattern, text or "")
+    phones = re.findall(phone_pattern, text or "")
 
     return {"locations": locations, "emails": emails, "phones": phones}
