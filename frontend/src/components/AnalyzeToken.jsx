@@ -50,6 +50,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
                 'Accept': 'application/json',
             },
             responseType: "json",
+            withCredentials: true,  
             validateStatus: (status) => status < 500,
           }
         );
