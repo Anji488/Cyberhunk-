@@ -11,10 +11,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -25,10 +25,15 @@ SECRET_KEY = 'django-insecure-hlqa933e$&irs(+u9)&yemqba(y2!cjw56xy85suu^mv#+n*&x
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+# Hosts allowed
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "cyberhunk.onrender.com",
+    "cyberhunk.vercel.app",
+]
 
 # Application definition
-
 INSTALLED_APPS = [
     'corsheaders', 
     'django.contrib.admin',
@@ -41,8 +46,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
-    "django.middleware.common.CommonMiddleware",
+    'corsheaders.middleware.CorsMiddleware',  # must be first
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -52,10 +57,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-
 ROOT_URLCONF = 'digital_responsibility.urls'
-
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 TEMPLATES = [
     {
@@ -75,10 +77,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'digital_responsibility.wsgi.application'
 
-
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -86,74 +85,39 @@ DATABASES = {
     }
 }
 
-
 # Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',},
 ]
 
-
 # Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
+# Static files
 STATIC_URL = 'static/'
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-from decouple import config
-
+# Facebook App settings
 FB_APP_ID = config("FB_APP_ID")
 FB_APP_SECRET = config("FB_APP_SECRET")
 
-
+# -----------------------------
+# CORS & CSRF Settings
+# -----------------------------
 CORS_ALLOWED_ORIGINS = [
     "https://cyberhunk.vercel.app",
-    "https://cyberhunk.onrender.com" 
+    "https://cyberhunk.onrender.com",
 ]
 
-
-CSRF_TRUSTED_ORIGINS = [
-    "https://cyberhunk.vercel.app",
-    "https://cyberhunk.onrender.com"
-]
-
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "cyberhunk.onrender.com",
-    "cyberhunk.vercel.app", 
-]
-
-
-
+CORS_ALLOW_CREDENTIALS = True  # needed for cookies
 CORS_ALLOW_HEADERS = [
     'authorization',
     'content-type',
@@ -163,14 +127,18 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+# Remove CORS_ALLOW_ALL_ORIGINS to avoid conflicts
 
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_HEADERS = True
-CORS_ALLOW_ALL_ORIGINS = True
+CSRF_TRUSTED_ORIGINS = [
+    "https://cyberhunk.vercel.app",
+    "https://cyberhunk.onrender.com"
+]
 
+# Cookies settings
 SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
 
+# Allow trailing slashes
 APPEND_SLASH = True
