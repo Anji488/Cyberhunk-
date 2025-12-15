@@ -30,6 +30,7 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders', 
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -133,18 +134,12 @@ from decouple import config
 FB_APP_ID = config("FB_APP_ID")
 FB_APP_SECRET = config("FB_APP_SECRET")
 
-BASE_URL = "https://cyberhunk.onrender.com"       # Django backend URL
-FRONTEND_URL = "https://cyberhunk.vercel.app"   # React frontend URL
 
 CORS_ALLOWED_ORIGINS = [
     "https://cyberhunk.vercel.app",
     "https://cyberhunk.onrender.com" 
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    FRONTEND_URL,
-    BASE_URL,
-]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://cyberhunk.vercel.app",
