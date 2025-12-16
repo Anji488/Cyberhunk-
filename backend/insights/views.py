@@ -36,21 +36,24 @@ MAX_NESTED = 5
 # SAFE REQUEST WRAPPER
 # ===================================
 def safe_request(url: str) -> dict:
-    """Performs a safe GET request with logging."""
     time.sleep(REQUEST_DELAY)
     try:
         res = requests.get(url, timeout=8)
-        res.raise_for_status()
-        return res.json()
 
-    except requests.exceptions.HTTPError:
-        if res.status_code == 400:
+        if res.status_code != 200:
+            logger.error(f"[FB ERROR] {res.status_code} -> {res.text[:200]}")
             return {}
-        logger.error(f"[HTTP ERROR] {url}")
-    except Exception as e:
-        logger.error(f"[REQUEST FAIL] {url} -> {e}")
 
-    return {}
+        try:
+            return res.json()
+        except ValueError:
+            logger.error(f"[FB INVALID JSON] {res.text[:200]}")
+            return {}
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[REQUEST FAIL] {url} -> {e}")
+        return {}
+
 
 
 # ===================================
