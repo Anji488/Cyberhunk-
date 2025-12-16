@@ -6,6 +6,7 @@ import requests
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .mongo_client import reports_collection
@@ -97,8 +98,29 @@ def fetch_nested_comments(comment: dict, token: str) -> list:
 # ===================================
 # MAIN ANALYSIS VIEW
 # ===================================
+@csrf_exempt
+@require_http_methods(["GET", "OPTIONS"])
 def analyze_facebook(request):
-    token = request.GET.get("token") or request.COOKIES.get("fb_token")
+
+    # ✅ Handle CORS preflight
+    if request.method == "OPTIONS":
+        response = JsonResponse({}, status=200)
+        response["Access-Control-Allow-Origin"] = "https://cyberhunk.vercel.app"
+        response["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+    # ✅ Read token ONLY from Authorization header
+    auth_header = request.headers.get("Authorization")
+
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return JsonResponse(
+            {"error": "Authorization token missing"},
+            status=401
+        )
+
+    token = auth_header.split(" ", 1)[1]
     method = request.GET.get("method", "ml")
 
     try:
@@ -106,10 +128,13 @@ def analyze_facebook(request):
     except ValueError:
         max_posts = DEFAULT_MAX_POSTS
 
-    if not token:
-        return JsonResponse({"error": "Token missing"}, status=401)
-
+    # =========================
+    # FETCH PROFILE
+    # =========================
     profile_data = fetch_profile(token)
+    if not profile_data:
+        return JsonResponse({"error": "Invalid Facebook token"}, status=401)
+
     insights = []
     shared_cache = {}
     fetched_posts = 0
@@ -120,9 +145,6 @@ def analyze_facebook(request):
         f"&limit=10&access_token={token}"
     )
 
-    # -----------------------------
-    # FETCH POSTS & COMMENTS
-    # -----------------------------
     while next_url and fetched_posts < max_posts:
         data = safe_request(next_url)
         posts = data.get("data", [])
@@ -131,31 +153,18 @@ def analyze_facebook(request):
             if fetched_posts >= max_posts:
                 break
 
-            # Resolve content
             content = post.get("message") or post.get("story") or ""
 
-            # Resolve shared stories
             if post.get("status_type") == "shared_story":
                 shared_id = post.get("object_id")
                 if shared_id and shared_id not in shared_cache:
-                    shared_msg = safe_request(
-                        f"https://graph.facebook.com/v19.0/{shared_id}?fields=message&access_token={token}"
+                    shared_cache[shared_id] = safe_request(
+                        f"https://graph.facebook.com/v19.0/{shared_id}"
+                        f"?fields=message&access_token={token}"
                     ).get("message", "")
-                    shared_cache[shared_id] = shared_msg
-
                 content = shared_cache.get(shared_id, content)
 
-            # Analyze post
-            try:
-                analysis = analyze_text(content, method)
-            except Exception as e:
-                logger.error(f"Sentiment failed: {e}")
-                analysis = {
-                    "original": content,
-                    "translated": "",
-                    "label": "neutral"
-                }
-
+            analysis = analyze_text(content, method)
             analysis.update({
                 "timestamp": post.get("created_time"),
                 "is_respectful": is_respectful(content),
@@ -169,88 +178,18 @@ def analyze_facebook(request):
 
             insights.append(analysis)
 
-            # -----------------------------
-            # COMMENTS + NESTED
-            # -----------------------------
-            top_comments = fetch_comments(post.get("id"), token)
-
-            all_comments = []
-            for c in top_comments:
-                all_comments.append(c)
-                all_comments.extend(fetch_nested_comments(c, token))
-
-            # Multithread comment sentiment
-            with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-                futures = {
-                    executor.submit(
-                        analyze_text, c.get("message", ""), method
-                    ): c for c in all_comments
-                }
-
-                for future in as_completed(futures):
-                    c = futures[future]
-                    msg = c.get("message", "")
-
-                    try:
-                        c_analysis = future.result()
-                    except Exception as e:
-                        logger.error(f"Comment analysis failed: {e}")
-                        c_analysis = {
-                            "original": msg,
-                            "translated": "",
-                            "label": "neutral"
-                        }
-
-                    c_analysis.update({
-                        "timestamp": c.get("created_time"),
-                        "is_respectful": is_respectful(msg),
-                        "mentions_location": mentions_location(msg),
-                        "privacy_disclosure": discloses_personal_info(msg),
-                        "toxic": is_toxic(msg),
-                        "misinformation_risk": is_potential_misinformation(msg),
-                        "type": "comment"
-                    })
-
-                    insights.append(c_analysis)
-
             fetched_posts += 1
 
         next_url = data.get("paging", {}).get("next")
 
-    # ===================================
-    # COMPUTE METRICS
-    # ===================================
     insightMetrics, recommendations = compute_insight_metrics(insights)
 
-    # ===================================
-    # AUTO-SAVE REPORT
-    # ===================================
-    report_id = str(uuid.uuid4())
-    user_id = str(request.user.id) if getattr(request.user, "is_authenticated", False) else "guest"
-
-    report_doc = {
-        "report_id": report_id,
-        "user_id": user_id,
-        "profile": profile_data,
-        "insights": insights,
-        "insightMetrics": insightMetrics,
-        "recommendations": recommendations,
-        "created_at": time.time()
-    }
-
-    reports_collection.insert_one(report_doc)
-
-    # ===================================
-    # RESPONSE
-    # ===================================
     return JsonResponse({
-        "report_id": report_id,
         "profile": profile_data,
         "insights": insights,
         "insightMetrics": insightMetrics,
         "recommendations": recommendations
     })
-
 
 # ===================================
 # SAVED REPORTS API

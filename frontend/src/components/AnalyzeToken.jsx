@@ -45,15 +45,15 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
         const res = await axios.get(
           `${BACKEND_URL}/insights/analyze/`,
           {
-            params: { token, method },
+            params: { method },
             headers: {
-                'Accept': 'application/json',
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
             },
-            responseType: "json",
-            withCredentials: true,  
-            validateStatus: (status) => status < 500,
+            withCredentials: true,
           }
         );
+
 
         console.log("✅ Raw backend response:", res.data);
 
