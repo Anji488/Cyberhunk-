@@ -25,8 +25,6 @@ SECRET_KEY = 'django-insecure-hlqa933e$&irs(+u9)&yemqba(y2!cjw56xy85suu^mv#+n*&x
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ["cyberhunk.onrender.com"]
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -42,7 +40,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
-    "django.middleware.common.CommonMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
