@@ -68,10 +68,6 @@ def fetch_profile(token: str) -> dict:
 # ===================================
 @csrf_exempt
 def analyze_facebook(request):
-
-    if request.method == "OPTIONS":
-        return JsonResponse({}, status=200)
-
     if request.method != "GET":
         return JsonResponse({"error": "Method not allowed"}, status=405)
 

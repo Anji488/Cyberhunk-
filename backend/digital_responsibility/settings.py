@@ -134,6 +134,12 @@ BASE_URL = "https://cyberhunk.onrender.com"       # Django backend URL
 FRONTEND_URL = "https://cyberhunk.vercel.app"   # React frontend URL
 
 
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "cyberhunk.onrender.com",
+]
+
 CORS_ALLOWED_ORIGINS = [
     "https://cyberhunk.vercel.app",
 ]
@@ -144,22 +150,16 @@ CSRF_TRUSTED_ORIGINS = [
     "https://cyberhunk.vercel.app",
 ]
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "cyberhunk.onrender.com",
-]
 
 
 
 CORS_ALLOW_HEADERS = [
-    'authorization',
-    'content-type',
-    'accept',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
+    "accept",
+    "authorization",
+    "content-type",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 
