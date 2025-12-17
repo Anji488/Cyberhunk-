@@ -38,17 +38,17 @@ INSTALLED_APPS = [
     'rest_framework',
 ]
 
-MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-]
 
+MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware", 
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
 
 ROOT_URLCONF = 'digital_responsibility.urls'
 
@@ -136,21 +136,18 @@ FRONTEND_URL = "https://cyberhunk.vercel.app"   # React frontend URL
 
 CORS_ALLOWED_ORIGINS = [
     "https://cyberhunk.vercel.app",
-    "https://cyberhunk.onrender.com" 
 ]
 
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "https://cyberhunk.vercel.app",
-    "https://cyberhunk.onrender.com"
 ]
 
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "cyberhunk.onrender.com",
-    "cyberhunk.vercel.app", 
 ]
 
 

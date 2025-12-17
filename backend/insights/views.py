@@ -29,18 +29,7 @@ DEFAULT_MAX_POSTS = 100
 MAX_COMMENTS = 100
 MAX_NESTED = 5
 FRONTEND_ORIGIN = "https://cyberhunk.vercel.app"
-
-
-# ===================================
-# CORS RESPONSE HELPER
-# ===================================
-def cors_json(data, status=200):
-    response = JsonResponse(data, status=status)
-    response["Access-Control-Allow-Origin"] = FRONTEND_ORIGIN
-    response["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-    response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-    response["Access-Control-Allow-Credentials"] = "true"
-    return response
+from django.views.decorators.csrf import csrf_exempt
 
 
 # ===================================
@@ -77,37 +66,30 @@ def fetch_profile(token: str) -> dict:
 # ===================================
 # MAIN ANALYSIS VIEW
 # ===================================
-@csrf_exempt
-@require_http_methods(["GET", "OPTIONS"])
+@@csrf_exempt
 def analyze_facebook(request):
 
-    # -----------------------------
-    # CORS PREFLIGHT
-    # -----------------------------
     if request.method == "OPTIONS":
-        return cors_json({}, 200)
+        return JsonResponse({}, status=200)
 
-    # -----------------------------
-    # AUTH HEADER
-    # -----------------------------
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-        return cors_json({"error": "Authorization token missing"}, 401)
+        return JsonResponse({"error": "Authorization token missing"}, status=401)
 
     token = auth_header.split(" ", 1)[1]
     method = request.GET.get("method", "ml")
 
     try:
-        max_posts = int(request.GET.get("max_posts", DEFAULT_MAX_POSTS))
+        max_posts = int(request.GET.get("max_posts", 100))
     except ValueError:
-        max_posts = DEFAULT_MAX_POSTS
+        max_posts = 100
 
-    # -----------------------------
-    # FETCH PROFILE
-    # -----------------------------
     profile_data = fetch_profile(token)
     if not profile_data:
-        return cors_json({"error": "Invalid Facebook token"}, 401)
+        return JsonResponse({"error": "Invalid Facebook token"}, status=401)
 
     insights = []
     fetched_posts = 0
@@ -118,9 +100,6 @@ def analyze_facebook(request):
         f"&limit=10&access_token={token}"
     )
 
-    # -----------------------------
-    # FETCH POSTS SAFELY
-    # -----------------------------
     while next_url and fetched_posts < max_posts:
         data = safe_request(next_url)
         posts = data.get("data", [])
@@ -131,15 +110,7 @@ def analyze_facebook(request):
 
             content = post.get("message") or post.get("story") or ""
 
-            try:
-                analysis = analyze_text(content, method)
-            except Exception as e:
-                logger.exception("Analysis failed")
-                analysis = {
-                    "error": "analysis_failed",
-                    "details": str(e)
-                }
-
+            analysis = analyze_text(content, method)
             analysis.update({
                 "timestamp": post.get("created_time"),
                 "is_respectful": is_respectful(content),
@@ -156,25 +127,14 @@ def analyze_facebook(request):
 
         next_url = data.get("paging", {}).get("next")
 
-    # -----------------------------
-    # METRICS (FAIL-SAFE)
-    # -----------------------------
-    try:
-        insight_metrics, recommendations = compute_insight_metrics(insights)
-    except Exception as e:
-        logger.exception("Metric computation failed")
-        insight_metrics, recommendations = [], []
+    insight_metrics, recommendations = compute_insight_metrics(insights)
 
-    # -----------------------------
-    # FINAL RESPONSE
-    # -----------------------------
-    return cors_json({
+    return JsonResponse({
         "profile": profile_data,
         "insights": insights,
         "insightMetrics": insight_metrics,
         "recommendations": recommendations
-    })
-
+    }, status=200)
 
 # ===================================
 # SAVED REPORTS API
