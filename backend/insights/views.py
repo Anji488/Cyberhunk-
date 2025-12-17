@@ -66,7 +66,7 @@ def fetch_profile(token: str) -> dict:
 # ===================================
 # MAIN ANALYSIS VIEW
 # ===================================
-@@csrf_exempt
+@csrf_exempt
 def analyze_facebook(request):
 
     if request.method == "OPTIONS":
