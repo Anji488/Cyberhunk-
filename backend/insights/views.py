@@ -28,6 +28,7 @@ REQUEST_DELAY = 0.3
 DEFAULT_MAX_POSTS = 100
 MAX_COMMENTS = 100
 MAX_NESTED = 5
+MAX_POSTS_LIMIT = 20
 
 # -----------------------------
 # Helper functions
