@@ -42,17 +42,17 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
 
       try {
         
-        const res = await axios.get(
-          `${BACKEND_URL}/insights/analyze/`,
-          {
-            params: { method },
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
-            withCredentials: true,
-          }
-        );
+        const res = await axios.get(`${BACKEND_URL}/insights/analyze/`, {
+          params: { 
+            method, 
+            max_posts: 5,
+            token: token
+          },
+          headers: { 
+            Authorization: `Bearer ${token}` 
+          },
+          withCredentials: true,
+        });
 
 
         console.log("✅ Raw backend response:", res.data);
