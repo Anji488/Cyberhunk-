@@ -101,18 +101,23 @@ def analyze_text(text: str, method="ml") -> dict:
             translated_text = processed_text
 
     # -------------------------
-    # Sentiment ML (safe)
+    # Sentiment ML (Updated for API)
     # -------------------------
     label = "neutral"
 
     if method == "ml":
-        sentiment_pipeline = insight_models.get_sentiment_model()
-        if sentiment_pipeline:
+        sentiment_predictor = insight_models.get_sentiment_model()
+        if sentiment_predictor:
             try:
-                pred = sentiment_pipeline(translated_text)
+                # The predictor now calls query_hf_api
+                pred = sentiment_predictor(translated_text)
+                
+                # API returns [[{'label': '...', 'score': ...}]]
                 if pred and isinstance(pred, list):
-                    raw_label = pred[0].get("label", "")
-                    score = float(pred[0].get("score", 0))
+                    # Handle nested list or single list response
+                    data = pred[0][0] if isinstance(pred[0], list) else pred[0]
+                    raw_label = data.get("label", "")
+                    score = float(data.get("score", 0))
                     mapped = map_sentiment_label(raw_label)
 
                     label = mapped if score >= 0.6 else "neutral"
@@ -156,7 +161,7 @@ def mentions_location(text: str):
 
 
 # =========================
-# ☣️ TOXICITY
+# ☣️ TOXICITY (Updated for API)
 # =========================
 def is_toxic(text: str) -> bool:
     if not text:
@@ -169,16 +174,18 @@ def is_toxic(text: str) -> bool:
     lowered = text.lower()
     keyword_match = any(word in lowered for word in toxic_keywords)
 
-    toxic_pipeline = insight_models.get_toxic_model()
+    toxic_predictor = insight_models.get_toxic_model()
     model_prediction = False
 
-    if toxic_pipeline:
+    if toxic_predictor:
         try:
-            pred = toxic_pipeline(text)
+            pred = toxic_predictor(text)
             if pred and isinstance(pred, list):
-                model_prediction = (
-                    str(pred[0].get("label", "")).lower() == "toxic"
-                )
+                # API response handling
+                data = pred[0][0] if isinstance(pred[0], list) else pred[0]
+                label = str(data.get("label", "")).lower()
+                # Check for 'toxic' label or high scores in specific labels
+                model_prediction = "toxic" in label or label == "label_1"
         except Exception as e:
             logger.error(f"[TOXIC MODEL ERROR] {e}")
 
@@ -207,21 +214,22 @@ def discloses_personal_info(text: str) -> bool:
 
 
 # =========================
-# 🧠 MISINFORMATION
+# 🧠 MISINFORMATION (Updated for API)
 # =========================
 def is_potential_misinformation(text: str) -> bool:
     if not text or not text.strip():
         return False
 
-    pipeline = insight_models.get_misinfo_model()
-    if not pipeline:
+    misinfo_predictor = insight_models.get_misinfo_model()
+    if not misinfo_predictor:
         return False
 
     try:
-        pred = pipeline(text)
+        pred = misinfo_predictor(text)
         if pred and isinstance(pred, list):
-            label = str(pred[0].get("label", "")).lower()
-            return label in {"misinfo", "misinformation", "true", "yes", "1"}
+            data = pred[0][0] if isinstance(pred[0], list) else pred[0]
+            label = str(data.get("label", "")).lower()
+            return label in {"misinfo", "misinformation", "true", "yes", "1", "label_1"}
     except Exception as e:
         logger.error(f"[MISINFO ERROR] {e}")
 
