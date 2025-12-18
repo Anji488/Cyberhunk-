@@ -92,11 +92,11 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
 
       } catch (err) {
         console.error("❌ Token analysis failed:", err);
-        setError(
-          err.message.includes("NGROK_ISSUE")
-            ? err.message
-            : "Failed to fetch or analyze Facebook data. Check your network or token."
-        );
+        const errorMessage = err.response 
+          ? `Server Error: ${err.response.status}`
+          : "Network/CORS Error: The backend is likely waking up or blocking the request.";
+          
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }

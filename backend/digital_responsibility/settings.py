@@ -132,7 +132,7 @@ FB_APP_SECRET = config("FB_APP_SECRET")
 
 BASE_URL = "https://cyberhunk.onrender.com"       # Django backend URL
 FRONTEND_URL = "https://cyberhunk.vercel.app"   # React frontend URL
-
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 ALLOWED_HOSTS = [
     "localhost",
@@ -148,6 +148,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "https://cyberhunk.vercel.app",
+    "https://cyberhunk.onrender.com",
 ]
 
 
