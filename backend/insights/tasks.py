@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 @shared_task
-def generate_report(report_id, token, method="ml", max_posts=100, user_id=None):
+def generate_report(report_id, token, method="ml", max_posts=5, user_id=None):
     try:
         # Step 1: Insert pending report
         reports_collection.insert_one({
