@@ -11,7 +11,7 @@ class Report(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
-    max_posts = models.IntegerField(default=100)
+    max_posts = models.IntegerField(default=5)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
 
     insights = JSONField(default=list, blank=True)

@@ -26,7 +26,7 @@ def query_hf_api(text, model_id):
         logger.error("❌ HUGGINGFACE_TOKEN is missing! Please set it in Render environment variables.")
         return None
 
-    api_url = f"https://api-inference.huggingface.co/models/{model_id}"
+    api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}"
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     
     try:
