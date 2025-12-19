@@ -17,9 +17,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import render
+from django.http import HttpResponse
 
 def home_view(request):
-    return render(request, "index.html")
+   return HttpResponse("<h1>CyberHunk API</h1><p>Status: Running</p>", status=200)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
