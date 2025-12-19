@@ -45,7 +45,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
         const res = await axios.get(`${BACKEND_URL}/insights/analyze/`, {
           params: { 
             method, 
-            max_posts: 5,
+            max_posts: 20,
             token: token
           },
           headers: { 
