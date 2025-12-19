@@ -23,13 +23,13 @@ from insights.services import (
 
 logger = logging.getLogger(__name__)
 
-MAX_THREADS = 5
+MAX_THREADS = 20
 REQUEST_DELAY = 0.3
 DEFAULT_MAX_POSTS = 100
 MAX_COMMENTS = 100
 MAX_POSTS_LIMIT = 20
-MAX_COMMENTS_LIMIT = 5
-MAX_NESTED = 5
+MAX_COMMENTS_LIMIT = 20
+MAX_NESTED = 20
 
 # -----------------------------
 # Helper functions
@@ -138,7 +138,7 @@ def analyze_facebook(request):
         
         fb_posts_url = (
             f"https://graph.facebook.com/v19.0/me/posts?"
-            f"fields=message,story,status_type,created_time,object_id&limit=5&access_token={token}"
+            f"fields=message,story,status_type,created_time,object_id&limit={MAX_POSTS_LIMIT}&access_token={token}"
         )
 
         while fb_posts_url and fetched_posts < max_posts:
