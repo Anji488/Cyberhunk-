@@ -21,6 +21,17 @@ from insights.services import (
     compute_insight_metrics
 )
 
+from django.http import HttpResponse
+
+def robots_txt(request):
+    lines = [
+        "User-agent: facebookexternalhit",
+        "Allow: /",
+        "User-agent: *",
+        "Allow: /",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
+
 logger = logging.getLogger(__name__)
 
 MAX_THREADS = 5
