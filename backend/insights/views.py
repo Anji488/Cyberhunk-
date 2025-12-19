@@ -142,7 +142,7 @@ def analyze_facebook(request):
         )
 
         while fb_posts_url and fetched_posts < max_posts:
-            res = requests.get(fb_posts_url, timeout=10)
+            res = requests.get(fb_posts_url, timeout=30)
             if res.status_code != 200: break
             
             data = res.json()
@@ -188,7 +188,7 @@ def analyze_facebook(request):
                     f"https://graph.facebook.com/v19.0/{post['id']}/comments?"
                     f"fields=message,created_time&limit={MAX_COMMENTS_LIMIT}&access_token={token}"
                 )
-                c_res = requests.get(comment_url, timeout=5)
+                c_res = requests.get(comment_url, timeout=20)
                 if c_res.status_code == 200:
                     for c in c_res.json().get("data", []):
                         c_text = c.get("message", "")
