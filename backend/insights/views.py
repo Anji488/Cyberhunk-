@@ -7,6 +7,7 @@ from insights import hf_models as models  # Hugging Face models
 
 import uuid
 import json
+from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from .mongo_client import reports_collection
@@ -21,7 +22,16 @@ from insights.services import (
     compute_insight_metrics
 )
 
-from django.http import HttpResponse
+
+
+
+MAX_THREADS = 5
+REQUEST_DELAY = 0.3
+DEFAULT_MAX_POSTS = 5
+MAX_COMMENTS = 5
+MAX_POSTS_LIMIT = 5
+MAX_COMMENTS_LIMIT = 5
+MAX_NESTED = 5
 
 def robots_txt(request):
     lines = [
@@ -33,14 +43,6 @@ def robots_txt(request):
     return HttpResponse("\n".join(lines), content_type="text/plain")
 
 logger = logging.getLogger(__name__)
-
-MAX_THREADS = 5
-REQUEST_DELAY = 0.3
-DEFAULT_MAX_POSTS = 5
-MAX_COMMENTS = 5
-MAX_POSTS_LIMIT = 5
-MAX_COMMENTS_LIMIT = 5
-MAX_NESTED = 5
 
 # -----------------------------
 # Helper functions
