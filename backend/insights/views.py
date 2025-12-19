@@ -1,16 +1,18 @@
 import time
 import requests
 import logging
-from django.http import JsonResponse
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from insights import hf_models as models  # Hugging Face models
-
 import uuid
 import json
+from datetime import datetime
+
+from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
+
+# Import MongoDB collection
 from .mongo_client import reports_collection
 
+# Import analysis services
 from insights.services import (
     analyze_text,
     is_respectful,
@@ -23,10 +25,10 @@ from insights.services import (
 
 logger = logging.getLogger(__name__)
 
+# --- CONSTANTS ---
 MAX_THREADS = 5
 REQUEST_DELAY = 0.3
-DEFAULT_MAX_POSTS = 100
-MAX_COMMENTS = 100
+DEFAULT_MAX_POSTS = 10
 MAX_POSTS_LIMIT = 20
 MAX_COMMENTS_LIMIT = 5
 MAX_NESTED = 5
@@ -37,16 +39,12 @@ MAX_NESTED = 5
 def safe_request(url: str) -> dict:
     time.sleep(REQUEST_DELAY)
     try:
-        res = requests.get(url)
+        res = requests.get(url, timeout=10)
         res.raise_for_status()
         return res.json()
-    except requests.exceptions.HTTPError as e:
-        if res.status_code == 400:
-            return {}
-        logger.error(f"HTTP error: {url} -> {e}")
     except Exception as e:
         logger.error(f"Request failed: {url} -> {e}")
-    return {}
+        return {}
 
 def fetch_profile(token: str) -> dict:
     url = (
@@ -56,31 +54,12 @@ def fetch_profile(token: str) -> dict:
     )
     return safe_request(url)
 
-def fetch_comments(post_id: str, token: str) -> list:
-    comments = []
-    next_url = f"https://graph.facebook.com/v19.0/{post_id}/comments?fields=message,created_time,comments&limit=20&access_token={token}"
-    while next_url and len(comments) < MAX_COMMENTS:
-        data = safe_request(next_url)
-        comments.extend(data.get("data", []))
-        next_url = data.get("paging", {}).get("next")
-    return comments[:MAX_COMMENTS]
-
-def fetch_nested_comments(comment: dict, token: str) -> list:
-    nested_comments = []
-    if "comments" in comment:
-        nested_data = comment["comments"].get("data", [])[:MAX_NESTED]
-        for nested in nested_data:
-            nested_comments.append(nested)
-            nested_comments.extend(fetch_nested_comments(nested, token))
-    return nested_comments
-
 # ===================================
 # CORS SAFE JSON RESPONSE HELPER
 # ===================================
 def cors_json_response(data, status=200):
     """Ensures CORS headers are present even if the view catches an error."""
     response = JsonResponse(data, status=status)
-    # Match your frontend Vercel URL
     response["Access-Control-Allow-Origin"] = "https://cyberhunk.vercel.app"
     response["Access-Control-Allow-Credentials"] = "true"
     response["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
@@ -88,11 +67,10 @@ def cors_json_response(data, status=200):
     return response
 
 # -----------------------------
-# Main View
+# Main Analysis View (With DB Save)
 # -----------------------------
 @csrf_exempt
 def analyze_facebook(request):
-    # 1. Handle Preflight OPTIONS request (Required for CORS)
     if request.method == "OPTIONS":
         return cors_json_response({})
 
@@ -100,42 +78,29 @@ def analyze_facebook(request):
         return cors_json_response({"error": "Method not allowed"}, status=405)
 
     try:
-        # 2. Flexible Token Extraction (Fixes the 401 issue)
+        # 1. Token Extraction
         token = None
         auth_header = request.headers.get("Authorization")
-        
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ", 1)[1]
         
-        # Fallbacks
         token = token or request.GET.get("token") or request.COOKIES.get("fb_token")
 
         if not token:
-            logger.error("401 Trace: No token found in headers, params, or cookies")
             return cors_json_response({"error": "Authorization token missing"}, status=401)
 
         method = request.GET.get("method", "ml")
-        max_posts = min(int(request.GET.get("max_posts", 10)), MAX_POSTS_LIMIT)
+        max_posts = min(int(request.GET.get("max_posts", DEFAULT_MAX_POSTS)), MAX_POSTS_LIMIT)
 
-        # 3. Fetch Profile (Verify Token with FB)
-        profile_url = (
-            f"https://graph.facebook.com/v19.0/me?"
-            f"fields=id,name,birthday,gender,picture.width(200).height(200)"
-            f"&access_token={token}"
-        )
-        profile_res = requests.get(profile_url, timeout=10)
-        
-        if profile_res.status_code != 200:
-            logger.error(f"FB API Error: {profile_res.text}")
+        # 2. Fetch Profile
+        profile_data = fetch_profile(token)
+        if not profile_data or "id" not in profile_data:
             return cors_json_response({"error": "Facebook rejected token or it expired"}, status=401)
-        
-        profile_data = profile_res.json()
 
-        # 4. Fetch Posts & Sequential Analysis
+        # 3. Main Loop
         insights = []
         shared_cache = {}
         fetched_posts = 0
-        
         fb_posts_url = (
             f"https://graph.facebook.com/v19.0/me/posts?"
             f"fields=message,story,status_type,created_time,object_id&limit=5&access_token={token}"
@@ -157,11 +122,12 @@ def analyze_facebook(request):
                 if post.get("status_type") == "shared_story":
                     shared_id = post.get("object_id")
                     if shared_id and shared_id not in shared_cache:
-                        shared_data = requests.get(
+                        shared_res = requests.get(
                             f"https://graph.facebook.com/v19.0/{shared_id}?fields=message&access_token={token}",
                             timeout=5
-                        ).json()
-                        shared_cache[shared_id] = shared_data.get("message", "")
+                        )
+                        if shared_res.status_code == 200:
+                            shared_cache[shared_id] = shared_res.json().get("message", "")
                     content = shared_cache.get(shared_id, content)
 
                 # ML Analysis (Post)
@@ -183,7 +149,7 @@ def analyze_facebook(request):
                 })
                 insights.append(analysis)
 
-                # 5. Fetch & Analyze Comments (Sequential to avoid OOM crash)
+                # 4. Fetch & Analyze Comments
                 comment_url = (
                     f"https://graph.facebook.com/v19.0/{post['id']}/comments?"
                     f"fields=message,created_time&limit={MAX_COMMENTS_LIMIT}&access_token={token}"
@@ -212,9 +178,29 @@ def analyze_facebook(request):
 
             fb_posts_url = data.get("paging", {}).get("next") if fetched_posts < max_posts else None
 
-        # 6. Final Calculations
+        # 5. Final Calculations
         insight_metrics, recommendations = compute_insight_metrics(insights)
 
+        # -----------------------------
+        # 💾 SAVE TO MONGODB
+        # -----------------------------
+        try:
+            report_doc = {
+                "report_id": str(uuid.uuid4()),
+                "user_id": str(request.user.id) if request.user.is_authenticated else "anonymous",
+                "profile": profile_data,
+                "insights": insights,
+                "insightMetrics": insight_metrics,
+                "recommendations": recommendations,
+                "method": method,
+                "created_at": datetime.utcnow()
+            }
+            reports_collection.insert_one(report_doc)
+            logger.info(f"Report saved to MongoDB: {report_doc['report_id']}")
+        except Exception as e:
+            logger.error(f"Database save failed: {e}")
+
+        # 6. Return response
         return cors_json_response({
             "profile": profile_data,
             "insights": insights,
@@ -224,16 +210,15 @@ def analyze_facebook(request):
 
     except Exception as e:
         logger.error(f"SYSTEM CRASH: {str(e)}")
-        return cors_json_response({
-            "error": "Internal Server Error",
-            "details": str(e)
-        }, status=500)
-    
+        return cors_json_response({"error": "Internal Server Error", "details": str(e)}, status=500)
+
+# -----------------------------
+# Async Reporting Views
+# -----------------------------
 @csrf_exempt
 @login_required
 def request_report(request):
-    from .tasks import generate_report  # move import here
-
+    from .tasks import generate_report
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -248,7 +233,6 @@ def request_report(request):
 
     report_id = str(uuid.uuid4())
     generate_report.delay(report_id, token, method, max_posts, user_id=request.user.id)
-
     return JsonResponse({"report_id": report_id, "status": "pending"})
 
 @login_required
