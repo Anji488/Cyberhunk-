@@ -1,3 +1,4 @@
+import re
 import logging
 import random
 from datetime import datetime
@@ -10,47 +11,63 @@ from insights import hf_models as insight_models
 from insights.hf_models import map_sentiment_label
 
 logger = logging.getLogger(__name__)
+
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
 
 # =========================
 # 🧹 TEXT NORMALIZATION
 # =========================
 def remove_variation_selectors(text: str) -> str:
+    """Remove emoji variation selectors (U+FE0F)."""
     return text.replace("\ufe0f", "")
+
 
 def is_emoji_only(text: str) -> bool:
     stripped = text.strip()
-    return bool(stripped) and all(ch in EMOJI_DATA or ch.isspace() for ch in stripped)
+    return bool(stripped) and all(
+        ch in EMOJI_DATA or ch.isspace() for ch in stripped
+    )
+
 
 # =========================
-# 📌 SENTIMENT ANALYSIS
+# 📌 CORE NLP ANALYSIS
 # =========================
 def analyze_text(text: str, method="ml") -> dict:
+    """
+    Advanced sentiment & emotion analysis using:
+    - Deep learning (BERT variants)
+    - Probability-based "happy" post detection
+    - Emoji handling
+    - Safe translation
+    """
     if not text or not text.strip():
-        return {
-            "original": text,
-            "translated": text,
-            "label": "neutral",
-            "confidence": 0.0,
-        }
+        return {"original": text, "translated": text, "label": "neutral", "happy_prob": 0.0}
 
     original_text = text.strip()
     clean_text = remove_variation_selectors(original_text)
 
     # Emoji-only handling
     if is_emoji_only(clean_text):
-        positive = {"😍", "🥰", "❤️", "😂", "😊", "👍"}
-        negative = {"😢", "💔", "😠", "😡", "😞"}
+        positive_emojis = {"😍", "🥰", "❤️", "😂", "😊", "👍"}
+        negative_emojis = {"😢", "💔", "😠", "😡", "😞"}
+        label = "neutral"
+        happy_prob = 0.0
+        if any(e in clean_text for e in positive_emojis):
+            label = "positive"
+            happy_prob = 0.9
+        elif any(e in clean_text for e in negative_emojis):
+            label = "negative"
+        return {
+            "original": original_text,
+            "translated": original_text,
+            "label": label,
+            "happy_prob": happy_prob,
+        }
 
-        if any(e in clean_text for e in positive):
-            return {"original": original_text, "translated": original_text, "label": "positive", "confidence": 0.9}
-        if any(e in clean_text for e in negative):
-            return {"original": original_text, "translated": original_text, "label": "negative", "confidence": 0.9}
-
-        return {"original": original_text, "translated": original_text, "label": "neutral", "confidence": 0.5}
-
+    # Emoji → text
     processed_text = demojize(clean_text).replace(":", " ").replace("_", " ")
 
+    # Language detection & safe translation
     try:
         lang = detect(processed_text)
     except LangDetectException:
@@ -60,25 +77,30 @@ def analyze_text(text: str, method="ml") -> dict:
     if lang != "en":
         try:
             from googletrans import Translator
-            translated_text = Translator().translate(processed_text, dest="en").text
+            translator = Translator()
+            translated_text = translator.translate(processed_text, dest="en").text
         except Exception as e:
             logger.warning(f"[TRANSLATION FAILED] {e}")
+            translated_text = processed_text
 
+    # Deep learning sentiment/emotion prediction
     label = "neutral"
-    confidence = 0.0
-
+    happy_prob = 0.0
     if method == "ml":
-        predictor = insight_models.get_sentiment_model()
-        if predictor:
+        sentiment_predictor = insight_models.get_sentiment_model()
+        if sentiment_predictor:
             try:
-                pred = predictor(translated_text)
-                data = pred[0][0] if isinstance(pred[0], list) else pred[0]
-                raw_label = data.get("label", "")
-                score = float(data.get("score", 0))
-                mapped = map_sentiment_label(raw_label)
+                pred = sentiment_predictor(translated_text)
+                # Expected API output: [[{'label': 'positive', 'score': 0.95}, ...]]
+                if pred and isinstance(pred, list):
+                    data = pred[0][0] if isinstance(pred[0], list) else pred[0]
+                    raw_label = data.get("label", "")
+                    score = float(data.get("score", 0))
+                    mapped_label = map_sentiment_label(raw_label)
 
-                label = mapped if score >= 0.6 else "neutral"
-                confidence = score
+                    label = mapped_label if score >= 0.6 else "neutral"
+                    # For happy detection, use positive probability as proxy
+                    happy_prob = score if mapped_label == "positive" else 0.0
             except Exception as e:
                 logger.error(f"[SENTIMENT ERROR] {e}")
 
@@ -86,127 +108,289 @@ def analyze_text(text: str, method="ml") -> dict:
         "original": original_text,
         "translated": translated_text,
         "label": label,
-        "confidence": confidence,
+        "happy_prob": happy_prob,
     }
 
 # =========================
-# 📍 LOCATION
+# 📍 LOCATION DETECTION
 # =========================
 def mentions_location(text: str):
     if not text:
         return None
+
     try:
-        ent = insight_models.extract_entities(text)
-        locs = ent.get("locations")
-        return locs[0] if locs else None
-    except Exception:
-        return None
+        entities = insight_models.extract_entities(text)
+        locations = entities.get("locations") if entities else None
+        if locations:
+            return locations[0]
+    except Exception as e:
+        logger.warning(f"[NER ERROR] {e}")
+
+    fallback_cities = [
+        "colombo", "kandy", "galle", "jaffna", "batticaloa",
+        "trincomalee", "negombo", "kurunegala", "anuradhapura",
+        "ratnapura", "badulla", "matara",
+    ]
+
+    lowered = text.lower()
+    for city in fallback_cities:
+        if city in lowered:
+            return city.capitalize()
+
+    return None
+
 
 # =========================
-# ☣️ TOXICITY (FIXED)
+# ☣️ TOXICITY (Updated for API)
 # =========================
-def is_toxic(text: str, sentiment_label: str = None) -> bool:
+def is_toxic(text: str) -> bool:
     if not text:
         return False
 
-    toxic_keywords = {"shit", "fuck", "bitch", "asshole", "bastard"}
+    toxic_keywords = {
+        "shit", "fuck", "bitch", "asshole", "bastard"
+    }
+
     lowered = text.lower()
-    keyword_match = any(w in lowered for w in toxic_keywords)
+    keyword_match = any(word in lowered for word in toxic_keywords)
 
-    predictor = insight_models.get_toxic_model()
-    model_pred = False
+    toxic_predictor = insight_models.get_toxic_model()
+    model_prediction = False
 
-    if predictor:
+    if toxic_predictor:
         try:
-            pred = predictor(text)
-            data = pred[0][0] if isinstance(pred[0], list) else pred[0]
+            pred = toxic_predictor(text)
+            if pred and isinstance(pred, list):
+                # API response handling
+                data = pred[0][0] if isinstance(pred[0], list) else pred[0]
+                label = str(data.get("label", "")).lower()
+                # Check for 'toxic' label or high scores in specific labels
+                model_prediction = "toxic" in label or label == "label_1"
+        except Exception as e:
+            logger.error(f"[TOXIC MODEL ERROR] {e}")
 
-            label = str(data.get("label", "")).lower()
-            score = float(data.get("score", 0))
+    return keyword_match or model_prediction
 
-            model_pred = score >= 0.75 and ("toxic" in label or label == "label_1")
-        except Exception:
-            pass
 
-    # Positive sentiment cancels weak toxicity
-    if sentiment_label == "positive" and not keyword_match:
-        return False
+def is_respectful(text: str) -> bool:
+    return not is_toxic(text)
 
-    return keyword_match or model_pred
-
-def is_respectful(text: str, sentiment_label: str = None) -> bool:
-    return not is_toxic(text, sentiment_label)
 
 # =========================
 # 🔐 PRIVACY
 # =========================
 def discloses_personal_info(text: str) -> bool:
-    try:
-        ent = insight_models.extract_entities(text)
-        return bool(ent.get("emails") or ent.get("phones"))
-    except Exception:
+    if not text:
         return False
 
-def privacy_risk(item: dict) -> float:
-    risk = 0.0
-    if item.get("mentions_location"):
-        risk += 0.4
-    if item.get("privacy_disclosure"):
-        risk += 0.6
-    return min(risk, 1.0)
+    try:
+        entities = insight_models.extract_entities(text)
+        return bool(
+            entities.get("phones") or entities.get("emails")
+        )
+    except Exception as e:
+        logger.warning(f"[PRIVACY CHECK ERROR] {e}")
+        return False
+
 
 # =========================
-# 📊 METRICS
+# 🧠 MISINFORMATION (Updated for API)
+# =========================
+def is_potential_misinformation(text: str) -> bool:
+    if not text or not text.strip():
+        return False
+
+    misinfo_predictor = insight_models.get_misinfo_model()
+    if not misinfo_predictor:
+        return False
+
+    try:
+        pred = misinfo_predictor(text)
+        if pred and isinstance(pred, list):
+            data = pred[0][0] if isinstance(pred[0], list) else pred[0]
+            label = str(data.get("label", "")).lower()
+            return label in {"misinfo", "misinformation", "true", "yes", "1", "label_1"}
+    except Exception as e:
+        logger.error(f"[MISINFO ERROR] {e}")
+
+    return False
+
+
+# =========================
+# 📊 METRICS & RECOMMENDATIONS
 # =========================
 def compute_insight_metrics(insights: list):
     total = max(len(insights), 1)
 
-    happy = 0
-    respect_scores = []
-    privacy_scores = []
-
-    hour_buckets = {"morning": 0, "afternoon": 0, "evening": 0, "night": 0}
+    sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
+    happy_posts = 0
+    night_posts = 0
+    location_mentions = 0
+    respectful_count = 0
 
     for item in insights:
-        if item.get("label") == "positive" and item.get("confidence", 0) >= 0.75:
-            happy += 1
+        label = (item.get("label") or "").lower()
+        if label in sentiment_counts:
+            sentiment_counts[label] += 1
 
-        respect_scores.append(1.0 if item.get("is_respectful") else 0.0)
-        privacy_scores.append(privacy_risk(item))
+        happy_prob = float(item.get("happy_prob", 0))
+        if happy_prob >= 0.6:  # 2025 research threshold
+            happy_posts += 1
 
         ts = item.get("timestamp")
         if ts:
             try:
-                dt = datetime.fromisoformat(ts.replace("Z", "")).replace(tzinfo=pytz.UTC)
-                hour = dt.astimezone(LOCAL_TZ).hour
-
-                if 5 <= hour <= 11:
-                    hour_buckets["morning"] += 1
-                elif 12 <= hour <= 16:
-                    hour_buckets["afternoon"] += 1
-                elif 17 <= hour <= 22:
-                    hour_buckets["evening"] += 1
-                else:
-                    hour_buckets["night"] += 1
+                dt = datetime.fromisoformat(ts.replace("Z", ""))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=pytz.UTC)
+                local_dt = dt.astimezone(LOCAL_TZ)
+                if local_dt.hour >= 23 or local_dt.hour < 6:
+                    night_posts += 1
             except Exception:
                 pass
 
-    best_time = max(hour_buckets, key=hour_buckets.get)
-    avg_respect = sum(respect_scores) / total
-    avg_privacy = sum(privacy_scores) / total
+        if item.get("mentions_location"):
+            location_mentions += 1
+
+        if item.get("is_respectful"):
+            respectful_count += 1
 
     insightMetrics = [
-        {"title": "Happy Posts", "value": round((happy / total) * 100)},
-        {
-            "title": "Best Posting Time",
-            "value": round((hour_buckets[best_time] / total) * 100),
-            "label": best_time.capitalize(),
-        },
-        {"title": "Respectful Behavior", "value": round(avg_respect * 100)},
-        {
-            "title": "Privacy Behavior",
-            "value": round((1 - avg_privacy) * 100),
-        },
+        {"title": "Happy Posts", "value": round((happy_posts / total) * 100)},
+        {"title": "Good Posting Habits", "value": round(100 - (night_posts / total) * 100)},
+        {"title": "Privacy Care", "value": round(100 - (location_mentions / total) * 100)},
+        {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
     ]
 
-    return insightMetrics, []
+    # Recommendations can remain the same
+    rec_pool = {
+        "positive_high": ["Your interactions are highly positive.", "Keep spreading positivity!"],
+        "positive_mid": ["Try sharing more uplifting content.", "Increase positive engagement."],
+        "positive_low": ["Focus on improving post positivity."],
+        "healthy": ["Great posting schedule.", "Healthy online habits."],
+        "unhealthy": ["Reduce late-night posting.", "Late posts can affect wellbeing."],
+        "privacy_good": ["Excellent privacy awareness.", "You share minimal sensitive info."],
+        "privacy_bad": ["Be cautious when sharing locations."],
+        "respect_high": ["Your communication is very respectful."],
+        "respect_mid": ["Some posts could be more respectful."],
+        "respect_low": ["Avoid harsh language and tone."],
+    }
+
+    recommendations = []
+    pos_pct = (sentiment_counts["positive"] / total) * 100
+    healthy_pct = 100 - (night_posts / total) * 100
+    privacy_pct = 100 - (location_mentions / total) * 100
+    respect_pct = (respectful_count / total) * 100
+
+    recommendations.append({
+        "text": random.choice(
+            rec_pool["positive_high"] if pos_pct >= 80 else
+            rec_pool["positive_mid"] if pos_pct >= 50 else
+            rec_pool["positive_low"]
+        )
+    })
+    recommendations.append({
+        "text": random.choice(
+            rec_pool["healthy"] if healthy_pct >= 80 else rec_pool["unhealthy"]
+        )
+    })
+    recommendations.append({
+        "text": random.choice(
+            rec_pool["privacy_good"] if privacy_pct >= 80 else rec_pool["privacy_bad"]
+        )
+    })
+    recommendations.append({
+        "text": random.choice(
+            rec_pool["respect_high"] if respect_pct >= 75 else
+            rec_pool["respect_mid"] if respect_pct >= 50 else
+            rec_pool["respect_low"]
+        )
+    })
+
+    return insightMetrics, recommendations
+    total = max(len(insights), 1)
+
+    sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
+    night_posts = 0
+    location_mentions = 0
+    respectful_count = 0
+
+    for item in insights:
+        label = (item.get("label") or "").lower()
+        if label in sentiment_counts:
+            sentiment_counts[label] += 1
+
+        ts = item.get("timestamp")
+        if ts:
+            try:
+                dt = datetime.fromisoformat(ts.replace("Z", ""))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=pytz.UTC)
+                local_dt = dt.astimezone(LOCAL_TZ)
+                if local_dt.hour >= 23 or local_dt.hour < 6:
+                    night_posts += 1
+            except Exception:
+                pass
+
+        if item.get("mentions_location"):
+            location_mentions += 1
+
+        if item.get("is_respectful"):
+            respectful_count += 1
+
+    insightMetrics = [
+        {"title": "Happy Posts", "value": round((sentiment_counts["positive"] / total) * 100)},
+        {"title": "Good Posting Habits", "value": round(100 - (night_posts / total) * 100)},
+        {"title": "Privacy Care", "value": round(100 - (location_mentions / total) * 100)},
+        {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
+    ]
+
+    rec_pool = {
+        "positive_high": ["Your interactions are highly positive.", "Keep spreading positivity!"],
+        "positive_mid": ["Try sharing more uplifting content.", "Increase positive engagement."],
+        "positive_low": ["Focus on improving post positivity."],
+        "healthy": ["Great posting schedule.", "Healthy online habits."],
+        "unhealthy": ["Reduce late-night posting.", "Late posts can affect wellbeing."],
+        "privacy_good": ["Excellent privacy awareness.", "You share minimal sensitive info."],
+        "privacy_bad": ["Be cautious when sharing locations."],
+        "respect_high": ["Your communication is very respectful."],
+        "respect_mid": ["Some posts could be more respectful."],
+        "respect_low": ["Avoid harsh language and tone."],
+    }
+
+    recommendations = []
+
+    pos_pct = (sentiment_counts["positive"] / total) * 100
+    healthy_pct = 100 - (night_posts / total) * 100
+    privacy_pct = 100 - (location_mentions / total) * 100
+    respect_pct = (respectful_count / total) * 100
+
+    recommendations.append({
+        "text": random.choice(
+            rec_pool["positive_high"] if pos_pct >= 80 else
+            rec_pool["positive_mid"] if pos_pct >= 50 else
+            rec_pool["positive_low"]
+        )
+    })
+
+    recommendations.append({
+        "text": random.choice(
+            rec_pool["healthy"] if healthy_pct >= 80 else rec_pool["unhealthy"]
+        )
+    })
+
+    recommendations.append({
+        "text": random.choice(
+            rec_pool["privacy_good"] if privacy_pct >= 80 else rec_pool["privacy_bad"]
+        )
+    })
+
+    recommendations.append({
+        "text": random.choice(
+            rec_pool["respect_high"] if respect_pct >= 75 else
+            rec_pool["respect_mid"] if respect_pct >= 50 else
+            rec_pool["respect_low"]
+        )
+    })
+
+    return insightMetrics, recommendations
