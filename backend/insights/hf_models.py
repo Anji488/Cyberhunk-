@@ -54,7 +54,7 @@ def query_hf_api(text, model_id):
 # -----------------------------
 def get_sentiment_model():
     # Industry standard for social media sentiment
-    return lambda text: query_hf_api(text, "cardiffnlp/twitter-roberta-base-sentiment-latest")
+    return lambda text: query_hf_api(text, "Anjanie/roberta-sentiment")
 
 def map_sentiment_label(label: str) -> str:
     # CardiffNLP uses specific labels: 0->Negative, 1->Neutral, 2->Positive
@@ -73,14 +73,14 @@ def map_sentiment_label(label: str) -> str:
 # -----------------------------
 def get_toxic_model():
     # The most popular public model for identifying toxic behavior
-    return lambda text: query_hf_api(text, "unitary/toxic-bert")
+    return lambda text: query_hf_api(text, "Anjanie/distilbert-base-uncased-toxicity")
 
 # -----------------------------
 # Misinformation Model (Public/Stable)
 # -----------------------------
 def get_misinfo_model():
     # Good general-purpose fake news/misinfo detector
-    return lambda text: query_hf_api(text, "dhruvpal/fake-news-bert")
+    return lambda text: query_hf_api(text, "Anjanie/bert-base-uncased-misinformation")
 
 # -----------------------------
 # NER Model (Locations/Privacy)
