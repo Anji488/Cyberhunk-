@@ -38,7 +38,6 @@ def analyze_text(text: str, method="ml") -> dict:
     - emoji handling
     - lazy translation
     - fail-safe ML execution
-    - research-backed sentiment thresholds (VADER-style)
     """
 
     if not text or not text.strip():
@@ -102,7 +101,7 @@ def analyze_text(text: str, method="ml") -> dict:
             translated_text = processed_text
 
     # -------------------------
-    # Sentiment ML (Research-aligned)
+    # Sentiment ML (Updated for API)
     # -------------------------
     label = "neutral"
 
@@ -110,22 +109,18 @@ def analyze_text(text: str, method="ml") -> dict:
         sentiment_predictor = insight_models.get_sentiment_model()
         if sentiment_predictor:
             try:
+                # The predictor now calls query_hf_api
                 pred = sentiment_predictor(translated_text)
+                
+                # API returns [[{'label': '...', 'score': ...}]]
                 if pred and isinstance(pred, list):
+                    # Handle nested list or single list response
                     data = pred[0][0] if isinstance(pred[0], list) else pred[0]
-                    raw_label = str(data.get("label", "")).lower()
+                    raw_label = data.get("label", "")
                     score = float(data.get("score", 0))
+                    mapped = map_sentiment_label(raw_label)
 
-                    # VADER-style threshold mapping
-                    # Positive if score >= 0.6, Negative if <= -0.6, Neutral otherwise
-                    if raw_label in {"positive", "pos", "happy"} and score >= 0.6:
-                        label = "positive"
-                    elif raw_label in {"negative", "neg", "sad"} and score <= 0.6:
-                        label = "negative"
-                    else:
-                        label = "neutral"
-
-
+                    label = mapped if score >= 0.6 else "neutral"
             except Exception as e:
                 logger.error(f"[SENTIMENT ERROR] {e}")
 
@@ -245,30 +240,18 @@ def is_potential_misinformation(text: str) -> bool:
 # 📊 METRICS & RECOMMENDATIONS
 # =========================
 def compute_insight_metrics(insights: list):
-    """
-    Compute metrics and recommendations for a batch of posts.
-    Metrics are now based on research-aligned sentiment scoring.
-    """
+    total = max(len(insights), 1)
 
-    total = max(len(insights), 1)  # Avoid division by zero
-
-    # Counters
     sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
     night_posts = 0
     location_mentions = 0
     respectful_count = 0
 
     for item in insights:
-        # -------------------------
-        # Sentiment
-        # -------------------------
         label = (item.get("label") or "").lower()
         if label in sentiment_counts:
             sentiment_counts[label] += 1
 
-        # -------------------------
-        # Night posting
-        # -------------------------
         ts = item.get("timestamp")
         if ts:
             try:
@@ -281,21 +264,12 @@ def compute_insight_metrics(insights: list):
             except Exception:
                 pass
 
-        # -------------------------
-        # Location mentions
-        # -------------------------
         if item.get("mentions_location"):
             location_mentions += 1
 
-        # -------------------------
-        # Respectful posts
-        # -------------------------
         if item.get("is_respectful"):
             respectful_count += 1
 
-    # -------------------------
-    # Metrics (percentages)
-    # -------------------------
     insightMetrics = [
         {"title": "Happy Posts", "value": round((sentiment_counts["positive"] / total) * 100)},
         {"title": "Good Posting Habits", "value": round(100 - (night_posts / total) * 100)},
@@ -303,9 +277,6 @@ def compute_insight_metrics(insights: list):
         {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
     ]
 
-    # -------------------------
-    # Recommendations pool
-    # -------------------------
     rec_pool = {
         "positive_high": ["Your interactions are highly positive.", "Keep spreading positivity!"],
         "positive_mid": ["Try sharing more uplifting content.", "Increase positive engagement."],
@@ -326,9 +297,6 @@ def compute_insight_metrics(insights: list):
     privacy_pct = 100 - (location_mentions / total) * 100
     respect_pct = (respectful_count / total) * 100
 
-    # -------------------------
-    # Generate recommendations based on thresholds
-    # -------------------------
     recommendations.append({
         "text": random.choice(
             rec_pool["positive_high"] if pos_pct >= 80 else
