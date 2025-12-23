@@ -117,13 +117,14 @@ def analyze_text(text: str, method="ml") -> dict:
                     score = float(data.get("score", 0))
 
                     # VADER-style threshold mapping
-                    # Positive if score >= 0.05, Negative if <= -0.05, Neutral otherwise
-                    if raw_label in {"positive", "pos", "happy"} and score >= 0.05:
+                    # Positive if score >= 0.6, Negative if <= -0.6, Neutral otherwise
+                    if raw_label in {"positive", "pos", "happy"} and score >= 0.6:
                         label = "positive"
-                    elif raw_label in {"negative", "neg", "sad"} and score <= -0.05:
+                    elif raw_label in {"negative", "neg", "sad"} and score >= 0.6:
                         label = "negative"
                     else:
                         label = "neutral"
+
 
             except Exception as e:
                 logger.error(f"[SENTIMENT ERROR] {e}")
