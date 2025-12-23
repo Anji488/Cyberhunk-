@@ -128,7 +128,7 @@ def is_toxic(text: str) -> bool:
 
 def respect_score(item: dict) -> float:
     score = 1.0
-    if item.get("toxic"):
+    if item.get("toxic", False):
         score -= 0.6
     if item.get("label") == "negative":
         score -= 0.2
@@ -191,8 +191,11 @@ def compute_insight_metrics(insights: list):
         ts = item.get("timestamp")
         if ts:
             try:
-                dt = datetime.fromisoformat(ts.replace("Z", "")).replace(tzinfo=pytz.UTC)
+                dt = datetime.fromisoformat(ts.replace("Z", ""))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=pytz.UTC)
                 hour = dt.astimezone(LOCAL_TZ).hour
+
                 if 5 <= hour <= 11:
                     hour_buckets["morning"] += 1
                 elif 12 <= hour <= 16:
@@ -216,10 +219,24 @@ def compute_insight_metrics(insights: list):
         privacy_profile = "High Disclosure"
 
     insightMetrics = [
-        {"title": "Happy Posts", "value": round((happy_count / total) * 100)},
-        {"title": "Best Posting Time", "value": best_time.capitalize()},
-        {"title": "Respectful Behavior", "value": round(avg_respect * 100)},
-        {"title": "Privacy Behavior", "value": privacy_profile},
+        {
+            "title": "Happy Posts",
+            "value": round((happy_count / total) * 100),
+        },
+        {
+            "title": "Best Posting Time",
+            "value": round((hour_buckets[best_time] / total) * 100),
+            "label": best_time.capitalize(),
+        },
+        {
+            "title": "Respectful Behavior",
+            "value": round(avg_respect * 100),
+        },
+        {
+            "title": "Privacy Behavior",
+            "value": round((1 - avg_privacy) * 100),
+            "label": privacy_profile,
+        },
     ]
 
     recommendations = [
