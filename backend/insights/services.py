@@ -1,4 +1,3 @@
-import re
 import logging
 import random
 from datetime import datetime
@@ -24,7 +23,7 @@ def is_emoji_only(text: str) -> bool:
     return bool(stripped) and all(ch in EMOJI_DATA or ch.isspace() for ch in stripped)
 
 # =========================
-# 📌 CORE NLP ANALYSIS
+# 📌 SENTIMENT ANALYSIS
 # =========================
 def analyze_text(text: str, method="ml") -> dict:
     if not text or not text.strip():
@@ -38,7 +37,7 @@ def analyze_text(text: str, method="ml") -> dict:
     original_text = text.strip()
     clean_text = remove_variation_selectors(original_text)
 
-    # Emoji-only shortcut
+    # Emoji-only handling
     if is_emoji_only(clean_text):
         positive = {"😍", "🥰", "❤️", "😂", "😊", "👍"}
         negative = {"😢", "💔", "😠", "😡", "😞"}
@@ -91,27 +90,28 @@ def analyze_text(text: str, method="ml") -> dict:
     }
 
 # =========================
-# 📍 LOCATION DETECTION
+# 📍 LOCATION
 # =========================
 def mentions_location(text: str):
     if not text:
         return None
     try:
-        entities = insight_models.extract_entities(text)
-        locs = entities.get("locations")
+        ent = insight_models.extract_entities(text)
+        locs = ent.get("locations")
         return locs[0] if locs else None
     except Exception:
         return None
 
 # =========================
-# ☣️ TOXICITY & RESPECT
+# ☣️ TOXICITY (FIXED)
 # =========================
-def is_toxic(text: str) -> bool:
+def is_toxic(text: str, sentiment_label: str = None) -> bool:
     if not text:
         return False
 
     toxic_keywords = {"shit", "fuck", "bitch", "asshole", "bastard"}
-    keyword_match = any(w in text.lower() for w in toxic_keywords)
+    lowered = text.lower()
+    keyword_match = any(w in lowered for w in toxic_keywords)
 
     predictor = insight_models.get_toxic_model()
     model_pred = False
@@ -120,22 +120,22 @@ def is_toxic(text: str) -> bool:
         try:
             pred = predictor(text)
             data = pred[0][0] if isinstance(pred[0], list) else pred[0]
-            model_pred = "toxic" in str(data.get("label", "")).lower()
+
+            label = str(data.get("label", "")).lower()
+            score = float(data.get("score", 0))
+
+            model_pred = score >= 0.75 and ("toxic" in label or label == "label_1")
         except Exception:
             pass
 
+    # Positive sentiment cancels weak toxicity
+    if sentiment_label == "positive" and not keyword_match:
+        return False
+
     return keyword_match or model_pred
 
-def respect_score(item: dict) -> float:
-    score = 1.0
-    if item.get("toxic", False):
-        score -= 0.6
-    if item.get("label") == "negative":
-        score -= 0.2
-    return max(score, 0.0)
-
-def is_respectful(text: str) -> bool:
-    return not is_toxic(text)
+def is_respectful(text: str, sentiment_label: str = None) -> bool:
+    return not is_toxic(text, sentiment_label)
 
 # =========================
 # 🔐 PRIVACY
@@ -156,26 +156,12 @@ def privacy_risk(item: dict) -> float:
     return min(risk, 1.0)
 
 # =========================
-# 🧠 MISINFORMATION
-# =========================
-def is_potential_misinformation(text: str) -> bool:
-    predictor = insight_models.get_misinfo_model()
-    if not predictor:
-        return False
-    try:
-        pred = predictor(text)
-        data = pred[0][0] if isinstance(pred[0], list) else pred[0]
-        return "label_1" in str(data.get("label", "")).lower()
-    except Exception:
-        return False
-
-# =========================
-# 📊 METRICS & RECOMMENDATIONS
+# 📊 METRICS
 # =========================
 def compute_insight_metrics(insights: list):
     total = max(len(insights), 1)
 
-    happy_count = 0
+    happy = 0
     respect_scores = []
     privacy_scores = []
 
@@ -183,17 +169,15 @@ def compute_insight_metrics(insights: list):
 
     for item in insights:
         if item.get("label") == "positive" and item.get("confidence", 0) >= 0.75:
-            happy_count += 1
+            happy += 1
 
-        respect_scores.append(respect_score(item))
+        respect_scores.append(1.0 if item.get("is_respectful") else 0.0)
         privacy_scores.append(privacy_risk(item))
 
         ts = item.get("timestamp")
         if ts:
             try:
-                dt = datetime.fromisoformat(ts.replace("Z", ""))
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=pytz.UTC)
+                dt = datetime.fromisoformat(ts.replace("Z", "")).replace(tzinfo=pytz.UTC)
                 hour = dt.astimezone(LOCAL_TZ).hour
 
                 if 5 <= hour <= 11:
@@ -211,39 +195,18 @@ def compute_insight_metrics(insights: list):
     avg_respect = sum(respect_scores) / total
     avg_privacy = sum(privacy_scores) / total
 
-    if avg_privacy < 0.3:
-        privacy_profile = "Low Disclosure"
-    elif avg_privacy < 0.6:
-        privacy_profile = "Moderate Disclosure"
-    else:
-        privacy_profile = "High Disclosure"
-
     insightMetrics = [
-        {
-            "title": "Happy Posts",
-            "value": round((happy_count / total) * 100),
-        },
+        {"title": "Happy Posts", "value": round((happy / total) * 100)},
         {
             "title": "Best Posting Time",
             "value": round((hour_buckets[best_time] / total) * 100),
             "label": best_time.capitalize(),
         },
-        {
-            "title": "Respectful Behavior",
-            "value": round(avg_respect * 100),
-        },
+        {"title": "Respectful Behavior", "value": round(avg_respect * 100)},
         {
             "title": "Privacy Behavior",
             "value": round((1 - avg_privacy) * 100),
-            "label": privacy_profile,
         },
     ]
 
-    recommendations = [
-        {"text": "You frequently share positive experiences." if happy_count / total >= 0.5 else "Try sharing more uplifting moments."},
-        {"text": f"Your engagement is strongest during the {best_time}."},
-        {"text": "Your communication style is respectful." if avg_respect >= 0.7 else "Consider a calmer tone in discussions."},
-        {"text": "You manage privacy responsibly." if avg_privacy < 0.4 else "Be cautious when sharing personal details."},
-    ]
-
-    return insightMetrics, recommendations
+    return insightMetrics, []
