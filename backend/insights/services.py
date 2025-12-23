@@ -120,7 +120,7 @@ def analyze_text(text: str, method="ml") -> dict:
                     # Positive if score >= 0.6, Negative if <= -0.6, Neutral otherwise
                     if raw_label in {"positive", "pos", "happy"} and score >= 0.6:
                         label = "positive"
-                    elif raw_label in {"negative", "neg", "sad"} and score >= 0.6:
+                    elif raw_label in {"negative", "neg", "sad"} and score <= 0.6:
                         label = "negative"
                     else:
                         label = "neutral"
