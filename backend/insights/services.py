@@ -34,73 +34,93 @@ def is_emoji_only(text: str) -> bool:
 # =========================
 def analyze_text(text: str, method="ml") -> dict:
     """
-    Advanced sentiment & emotion analysis using:
-    - Deep learning (BERT variants)
-    - Probability-based "happy" post detection
-    - Emoji handling
-    - Safe translation
+    Safe sentiment analysis with:
+    - emoji handling
+    - lazy translation
+    - fail-safe ML execution
     """
+
     if not text or not text.strip():
-        return {"original": text, "translated": text, "label": "neutral", "happy_prob": 0.0}
+        return {
+            "original": text,
+            "translated": text,
+            "label": "neutral",
+        }
 
     original_text = text.strip()
     clean_text = remove_variation_selectors(original_text)
 
+    # -------------------------
     # Emoji-only handling
+    # -------------------------
     if is_emoji_only(clean_text):
         positive_emojis = {"😍", "🥰", "❤️", "😂", "😊", "👍"}
         negative_emojis = {"😢", "💔", "😠", "😡", "😞"}
-        label = "neutral"
-        happy_prob = 0.0
+
         if any(e in clean_text for e in positive_emojis):
             label = "positive"
-            happy_prob = 0.9
         elif any(e in clean_text for e in negative_emojis):
             label = "negative"
+        else:
+            label = "neutral"
+
         return {
             "original": original_text,
             "translated": original_text,
             "label": label,
-            "happy_prob": happy_prob,
         }
 
+    # -------------------------
     # Emoji → text
-    processed_text = demojize(clean_text).replace(":", " ").replace("_", " ")
+    # -------------------------
+    processed_text = demojize(clean_text)
+    processed_text = processed_text.replace(":", " ").replace("_", " ")
 
-    # Language detection & safe translation
+    # -------------------------
+    # Language detection
+    # -------------------------
     try:
         lang = detect(processed_text)
     except LangDetectException:
         lang = "en"
 
     translated_text = processed_text
+
+    # -------------------------
+    # Lazy translation (safe)
+    # -------------------------
     if lang != "en":
         try:
-            from googletrans import Translator
+            from googletrans import Translator  # lazy import
             translator = Translator()
-            translated_text = translator.translate(processed_text, dest="en").text
+            translated_text = translator.translate(
+                processed_text, dest="en"
+            ).text
         except Exception as e:
             logger.warning(f"[TRANSLATION FAILED] {e}")
             translated_text = processed_text
 
-    # Deep learning sentiment/emotion prediction
+    # -------------------------
+    # Sentiment ML (Updated for API)
+    # -------------------------
     label = "neutral"
-    happy_prob = 0.0
+
     if method == "ml":
         sentiment_predictor = insight_models.get_sentiment_model()
         if sentiment_predictor:
             try:
+                # The predictor now calls query_hf_api
                 pred = sentiment_predictor(translated_text)
-                # Expected API output: [[{'label': 'positive', 'score': 0.95}, ...]]
+                
+                # API returns [[{'label': '...', 'score': ...}]]
                 if pred and isinstance(pred, list):
+                    # Handle nested list or single list response
                     data = pred[0][0] if isinstance(pred[0], list) else pred[0]
                     raw_label = data.get("label", "")
                     score = float(data.get("score", 0))
-                    mapped_label = map_sentiment_label(raw_label)
+                    mapped = map_sentiment_label(raw_label)
 
-                    label = mapped_label if score >= 0.6 else "neutral"
-                    # For happy detection, use positive probability as proxy
-                    happy_prob = score if mapped_label == "positive" else 0.0
+                    label = mapped if score >= 0.6 else "neutral"
             except Exception as e:
                 logger.error(f"[SENTIMENT ERROR] {e}")
 
@@ -108,8 +128,8 @@ def analyze_text(text: str, method="ml") -> dict:
         "original": original_text,
         "translated": translated_text,
         "label": label,
-        "happy_prob": happy_prob,
     }
+
 
 # =========================
 # 📍 LOCATION DETECTION
@@ -220,94 +240,6 @@ def is_potential_misinformation(text: str) -> bool:
 # 📊 METRICS & RECOMMENDATIONS
 # =========================
 def compute_insight_metrics(insights: list):
-    total = max(len(insights), 1)
-
-    sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
-    happy_posts = 0
-    night_posts = 0
-    location_mentions = 0
-    respectful_count = 0
-
-    for item in insights:
-        label = (item.get("label") or "").lower()
-        if label in sentiment_counts:
-            sentiment_counts[label] += 1
-
-        happy_prob = float(item.get("happy_prob", 0))
-        if happy_prob >= 0.6:  # 2025 research threshold
-            happy_posts += 1
-
-        ts = item.get("timestamp")
-        if ts:
-            try:
-                dt = datetime.fromisoformat(ts.replace("Z", ""))
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=pytz.UTC)
-                local_dt = dt.astimezone(LOCAL_TZ)
-                if local_dt.hour >= 23 or local_dt.hour < 6:
-                    night_posts += 1
-            except Exception:
-                pass
-
-        if item.get("mentions_location"):
-            location_mentions += 1
-
-        if item.get("is_respectful"):
-            respectful_count += 1
-
-    insightMetrics = [
-        {"title": "Happy Posts", "value": round((happy_posts / total) * 100)},
-        {"title": "Good Posting Habits", "value": round(100 - (night_posts / total) * 100)},
-        {"title": "Privacy Care", "value": round(100 - (location_mentions / total) * 100)},
-        {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
-    ]
-
-    # Recommendations can remain the same
-    rec_pool = {
-        "positive_high": ["Your interactions are highly positive.", "Keep spreading positivity!"],
-        "positive_mid": ["Try sharing more uplifting content.", "Increase positive engagement."],
-        "positive_low": ["Focus on improving post positivity."],
-        "healthy": ["Great posting schedule.", "Healthy online habits."],
-        "unhealthy": ["Reduce late-night posting.", "Late posts can affect wellbeing."],
-        "privacy_good": ["Excellent privacy awareness.", "You share minimal sensitive info."],
-        "privacy_bad": ["Be cautious when sharing locations."],
-        "respect_high": ["Your communication is very respectful."],
-        "respect_mid": ["Some posts could be more respectful."],
-        "respect_low": ["Avoid harsh language and tone."],
-    }
-
-    recommendations = []
-    pos_pct = (sentiment_counts["positive"] / total) * 100
-    healthy_pct = 100 - (night_posts / total) * 100
-    privacy_pct = 100 - (location_mentions / total) * 100
-    respect_pct = (respectful_count / total) * 100
-
-    recommendations.append({
-        "text": random.choice(
-            rec_pool["positive_high"] if pos_pct >= 80 else
-            rec_pool["positive_mid"] if pos_pct >= 50 else
-            rec_pool["positive_low"]
-        )
-    })
-    recommendations.append({
-        "text": random.choice(
-            rec_pool["healthy"] if healthy_pct >= 80 else rec_pool["unhealthy"]
-        )
-    })
-    recommendations.append({
-        "text": random.choice(
-            rec_pool["privacy_good"] if privacy_pct >= 80 else rec_pool["privacy_bad"]
-        )
-    })
-    recommendations.append({
-        "text": random.choice(
-            rec_pool["respect_high"] if respect_pct >= 75 else
-            rec_pool["respect_mid"] if respect_pct >= 50 else
-            rec_pool["respect_low"]
-        )
-    })
-
-    return insightMetrics, recommendations
     total = max(len(insights), 1)
 
     sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
