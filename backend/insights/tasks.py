@@ -1,53 +1,51 @@
 from celery import shared_task
-from .mongo_client import reports_collection
-from django.test import RequestFactory
-from .views import analyze_facebook
 from datetime import datetime
 import logging
 
+from .mongo_client import reports_collection
+from .report_service import analyze_facebook_data
+
 logger = logging.getLogger(__name__)
 
-@shared_task
-def generate_report(report_id, token, method="ml", max_posts=5, user_id=None):
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=10,
+    retry_kwargs={"max_retries": 3}
+)
+def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=None):
+
+    # Step 1: Create report
+    reports_collection.insert_one({
+        "report_id": report_id,
+        "user_id": str(user_id),
+        "status": "processing",
+        "created_at": datetime.utcnow()
+    })
+
     try:
-        # Step 1: Insert pending report
-        reports_collection.insert_one({
-            "report_id": report_id,
-            "user_id": str(user_id),
-            "status": "processing",
-            "created_at": datetime.utcnow(),
-            "profile_data": {},
-            "insights": [],
-            "insight_metrics": [],
-            "recommendations": []
-        })
+        result = analyze_facebook_data(token, method, max_posts)
 
-        # Step 2: Use existing analyze_facebook logic
-        factory = RequestFactory()
-        request = factory.get("/fake-url", {
-            "token": token,
-            "method": method,
-            "max_posts": max_posts
-        })
-
-        response = analyze_facebook(request)
-        data = response.json()
-
-        # Step 3: Update report in MongoDB
+        # Step 2: Save results
         reports_collection.update_one(
             {"report_id": report_id},
             {"$set": {
                 "status": "completed",
-                "profile_data": data.get("profile"),
-                "insights": data.get("insights"),
-                "insight_metrics": data.get("insightMetrics"),
-                "recommendations": data.get("recommendations"),
-                "updated_at": datetime.utcnow()
+                "completed_at": datetime.utcnow(),
+                "data": result
             }}
         )
+
     except Exception as e:
-        logger.error(f"Report generation failed: {e}")
+        logger.error(f"Report failed: {e}")
+
         reports_collection.update_one(
             {"report_id": report_id},
-            {"$set": {"status": "failed", "error": str(e), "updated_at": datetime.utcnow()}}
+            {"$set": {
+                "status": "failed",
+                "error": str(e),
+                "failed_at": datetime.utcnow()
+            }}
         )
+        raise
