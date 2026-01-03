@@ -89,7 +89,20 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
         });
 
         if (onInsightsFetched) onInsightsFetched(finalData);
-
+        try {
+          await axios.post(
+            `${BACKEND_URL}/insights/request-report/`,
+            {
+              token: token,
+              method,
+              max_posts: 5,
+            },
+            { withCredentials: true }
+          );
+          console.log("✅ Report generation triggered");
+        } catch (e) {
+          console.error("❌ Failed to trigger report generation", e);
+        }
       } catch (err) {
         console.error("❌ Token analysis failed:", err);
         const errorMessage = err.response 

@@ -20,13 +20,18 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
     reports_collection.insert_one({
         "report_id": report_id,
         "user_id": str(user_id),
+        "profile_id": None,  # will update later
         "status": "processing",
         "created_at": datetime.utcnow()
     })
 
+
     try:
+        from .report_service import fetch_profile
+
         profile = fetch_profile(token)
         result = analyze_facebook_data(token, method, max_posts)
+
 
         reports_collection.update_one(
             {"report_id": report_id},
@@ -34,11 +39,13 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
                 "status": "completed",
                 "completed_at": datetime.utcnow(),
                 "profile": profile,
+                "profile_id": profile.get("id") if profile else None,
                 "insights": result["insights"],
                 "insightMetrics": result["insightMetrics"],
                 "recommendations": result["recommendations"],
             }}
         )
+
 
 
 
