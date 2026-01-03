@@ -264,15 +264,22 @@ def request_report(request):
 
     return JsonResponse({"report_id": report_id, "status": "pending"})
 
-@login_required
+@csrf_exempt
 def get_reports(request):
     user_id = str(request.user.id)
-    reports = list(reports_collection.find({"user_id": user_id}).sort("created_at", -1))
+    profile_id = request.GET.get("profile_id")
+
+    query = {}
+    if profile_id:
+        query["profile_id"] = profile_id
+
+    reports = list(reports_collection.find(query).sort("created_at", -1))
+
     for r in reports:
         r["_id"] = str(r["_id"])
     return JsonResponse({"reports": reports})
 
-@login_required
+@csrf_exempt
 def get_report(request, report_id):
     report = reports_collection.find_one({"report_id": report_id, "user_id": str(request.user.id)})
     if not report:

@@ -326,3 +326,12 @@ def compute_insight_metrics(insights: list):
     })
 
     return insightMetrics, recommendations
+
+def fetch_profile(token):
+    url = (
+        f"https://graph.facebook.com/v19.0/me?"
+        f"fields=id,name,birthday,gender,picture.width(200).height(200)"
+        f"&access_token={token}"
+    )
+    res = requests.get(url, timeout=10)
+    return res.json() if res.status_code == 200 else None
