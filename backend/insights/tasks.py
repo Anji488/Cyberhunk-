@@ -3,36 +3,33 @@ from datetime import datetime
 import logging
 
 from .mongo_client import reports_collection
-from .report_service import analyze_facebook_data
+from .report_service import analyze_facebook_data, fetch_profile
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_backoff=10,
-    retry_kwargs={"max_retries": 3}
-)
+@shared_task(bind=True)
 def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=None):
 
-    # Step 1: Create report
-    reports_collection.insert_one({
-        "report_id": report_id,
-        "user_id": str(user_id) if user_id else None,
-        "profile_id": None,  # will update later
-        "status": "processing",
-        "created_at": datetime.utcnow()
-    })
-
+    # Step 1: Create report record
+    try:
+        reports_collection.insert_one({
+            "report_id": report_id,
+            "user_id": str(user_id) if user_id else None,
+            "profile_id": None,
+            "status": "processing",
+            "created_at": datetime.utcnow()
+        })
+    except Exception as e:
+        logger.error(f"Mongo insert failed: {e}")
+        return  # ❗ stop task completely
 
     try:
-        from .report_service import fetch_profile
-
+        # Step 2: Fetch profile + analyze
         profile = fetch_profile(token)
         result = analyze_facebook_data(token, method, max_posts)
 
-
+        # Step 3: Update report
         reports_collection.update_one(
             {"report_id": report_id},
             {"$set": {
@@ -40,14 +37,14 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
                 "completed_at": datetime.utcnow(),
                 "profile": profile,
                 "profile_id": profile.get("id") if profile else None,
-                "insights": result["insights"],
-                "insightMetrics": result["insightMetrics"],
-                "recommendations": result["recommendations"],
+                "insights": result.get("insights", []),
+                "insightMetrics": result.get("insightMetrics", []),
+                "recommendations": result.get("recommendations", []),
             }}
         )
 
     except Exception as e:
-        logger.error(f"Report failed: {e}")
+        logger.exception("Report generation failed")
 
         reports_collection.update_one(
             {"report_id": report_id},
@@ -57,4 +54,3 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
                 "failed_at": datetime.utcnow()
             }}
         )
-        raise
