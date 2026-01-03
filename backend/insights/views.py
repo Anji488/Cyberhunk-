@@ -252,11 +252,16 @@ def analyze_facebook(request):
     
 @csrf_exempt
 def request_report(request):
-    from .tasks import generate_report  # move import here
+    from .tasks import generate_report
 
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    # ✅ SAFE JSON PARSING
     try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
+        data = json.loads(request.body or "{}")
+    except Exception as e:
+        logger.error(f"Invalid JSON body: {e}")
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     token = data.get("token")
@@ -268,17 +273,26 @@ def request_report(request):
 
     report_id = str(uuid.uuid4())
 
-    # No Django auth → no user_id
-    generate_report.delay(
-        report_id,
-        token,
-        method,
-        max_posts,
-        user_id=None
-    )
+    # ✅ SAFE CELERY DISPATCH
+    try:
+        generate_report.delay(
+            report_id,
+            token,
+            method,
+            max_posts,
+            user_id=None
+        )
+    except Exception as e:
+        logger.error(f"Celery dispatch failed: {e}")
+        return JsonResponse(
+            {"error": "Report queue unavailable"},
+            status=503
+        )
 
-
-    return JsonResponse({"report_id": report_id, "status": "pending"})
+    return JsonResponse({
+        "report_id": report_id,
+        "status": "pending"
+    })
 
 @csrf_exempt
 def get_reports(request):
