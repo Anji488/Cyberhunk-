@@ -259,7 +259,16 @@ def request_report(request):
         return JsonResponse({"error": "Token required"}, status=400)
 
     report_id = str(uuid.uuid4())
-    generate_report.delay(report_id, token, method, max_posts, user_id=request.user.id)
+
+    # No Django auth → no user_id
+    generate_report.delay(
+        report_id,
+        token,
+        method,
+        max_posts,
+        user_id=None
+    )
+
 
     return JsonResponse({"report_id": report_id, "status": "pending"})
 

@@ -19,7 +19,7 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
     # Step 1: Create report
     reports_collection.insert_one({
         "report_id": report_id,
-        "user_id": str(user_id),
+        "user_id": str(user_id) if user_id else None,
         "profile_id": None,  # will update later
         "status": "processing",
         "created_at": datetime.utcnow()
@@ -45,9 +45,6 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
                 "recommendations": result["recommendations"],
             }}
         )
-
-
-
 
     except Exception as e:
         logger.error(f"Report failed: {e}")
