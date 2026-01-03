@@ -243,7 +243,6 @@ def analyze_facebook(request):
         }, status=500)
     
 @csrf_exempt
-@login_required
 def request_report(request):
     from .tasks import generate_report  # move import here
 
