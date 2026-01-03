@@ -25,17 +25,22 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
     })
 
     try:
+        profile = fetch_profile(token)
         result = analyze_facebook_data(token, method, max_posts)
 
-        # Step 2: Save results
         reports_collection.update_one(
             {"report_id": report_id},
             {"$set": {
                 "status": "completed",
                 "completed_at": datetime.utcnow(),
-                "data": result
+                "profile": profile,
+                "insights": result["insights"],
+                "insightMetrics": result["insightMetrics"],
+                "recommendations": result["recommendations"],
             }}
         )
+
+
 
     except Exception as e:
         logger.error(f"Report failed: {e}")

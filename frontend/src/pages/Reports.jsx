@@ -38,7 +38,10 @@ export default function ReportsPage({ token }) {
         setReports(list);
 
         if (list.length > 0) {
-          const sorted = [...list].sort((a, b) => b.created_at - a.created_at);
+          sorted.sort(
+            (a, b) => new Date(b.created_at) - new Date(a.created_at)
+          );
+
           fetchReport(sorted[0].report_id);
         } else {
           setSelectedReport(null);

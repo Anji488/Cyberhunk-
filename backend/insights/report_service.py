@@ -64,3 +64,12 @@ def analyze_facebook_data(token, method="ml", max_posts=5):
         "insightMetrics": metrics,
         "recommendations": recommendations
     }
+
+def fetch_profile(token):
+    url = (
+        f"https://graph.facebook.com/v19.0/me?"
+        f"fields=id,name,birthday,gender,picture.width(200).height(200)"
+        f"&access_token={token}"
+    )
+    res = requests.get(url, timeout=10)
+    return res.json() if res.status_code == 200 else None
