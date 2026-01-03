@@ -71,5 +71,10 @@ def fetch_profile(token):
         f"fields=id,name,birthday,gender,picture.width(200).height(200)"
         f"&access_token={token}"
     )
-    res = requests.get(url, timeout=10)
+    try:
+        res = requests.get(url, timeout=10)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Facebook API unreachable: {e}")
+        return None
+
     return res.json() if res.status_code == 200 else None

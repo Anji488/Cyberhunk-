@@ -136,7 +136,15 @@ def analyze_facebook(request):
             f"fields=id,name,birthday,gender,picture.width(200).height(200)"
             f"&access_token={token}"
         )
-        profile_res = requests.get(profile_url, timeout=10)
+        try:
+            profile_res = requests.get(profile_url, timeout=10)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Facebook connection failed: {e}")
+            return JsonResponse({
+                "error": "Facebook API unreachable",
+                "details": "Backend cannot connect to Facebook right now. Please retry."
+            }, status=503)
+
         
         if profile_res.status_code != 200:
             logger.error(f"FB API Error: {profile_res.text}")
@@ -294,3 +302,11 @@ def get_report(request, report_id):
         return JsonResponse({"error": "Report not found"}, status=404)
     report["_id"] = str(report["_id"])
     return JsonResponse(report)
+
+@csrf_exempt
+def ping_facebook(request):
+    try:
+        r = requests.get("https://graph.facebook.com", timeout=5)
+        return JsonResponse({"status": r.status_code})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
