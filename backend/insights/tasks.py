@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True)
 def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=None):
 
+    logger.info(f"📝 Attempting DB insert | report_id={report_id}")
     # Step 1: Create report record
     try:
         reports_collection.insert_one({
@@ -20,7 +21,9 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
             "status": "processing",
             "created_at": datetime.utcnow()
         })
+        logger.info(f"✅ DB INSERT SUCCESS | _id={result.inserted_id}")
     except Exception as e:
+        logger.exception("❌ DB INSERT FAILED")
         logger.error(f"Mongo insert failed: {e}")
         return  # ❗ stop task completely
 
@@ -30,7 +33,7 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
         result = analyze_facebook_data(token, method, max_posts)
 
         # Step 3: Update report
-        reports_collection.update_one(
+        update = reports_collection.update_one(
             {"report_id": report_id},
             {"$set": {
                 "status": "completed",
@@ -42,6 +45,12 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
                 "recommendations": result.get("recommendations", []),
             }}
         )
+
+        logger.info(
+            f"📌 DB UPDATE | report_id={report_id} "
+            f"matched={update.matched_count} modified={update.modified_count}"
+        )
+
 
     except Exception as e:
         logger.exception("Report generation failed")

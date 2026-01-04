@@ -249,7 +249,9 @@ def analyze_facebook(request):
             "error": "Internal Server Error",
             "details": str(e)
         }, status=500)
-    
+logger.info("➡️ /insights/request-report CALLED")
+logger.info(f"🚀 Starting report generation {report_id}")
+
 @csrf_exempt
 def request_report(request):
     from .tasks import generate_report
@@ -275,7 +277,7 @@ def request_report(request):
 
     # ✅ SAFE CELERY DISPATCH
     try:
-        generate_report.delay(
+        generate_report(
             report_id,
             token,
             method,
