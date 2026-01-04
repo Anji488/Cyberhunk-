@@ -256,10 +256,11 @@ logger.info(f"🚀 Starting report generation {report_id}")
 def request_report(request):
     from .tasks import generate_report
 
+    logger.info("➡️ /insights/request-report CALLED")
+
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
-    # ✅ SAFE JSON PARSING
     try:
         data = json.loads(request.body or "{}")
     except Exception as e:
@@ -275,7 +276,9 @@ def request_report(request):
 
     report_id = str(uuid.uuid4())
 
-    # ✅ SAFE CELERY DISPATCH
+    # ✅ NOW THIS IS SAFE
+    logger.info(f"🚀 Starting report generation | report_id={report_id}")
+
     try:
         generate_report(
             report_id,
@@ -286,10 +289,7 @@ def request_report(request):
         )
     except Exception as e:
         logger.error(f"Celery dispatch failed: {e}")
-        return JsonResponse(
-            {"error": "Report queue unavailable"},
-            status=503
-        )
+        return JsonResponse({"error": "Report queue unavailable"}, status=503)
 
     return JsonResponse({
         "report_id": report_id,
