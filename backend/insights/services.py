@@ -242,79 +242,116 @@ def is_potential_misinformation(text: str) -> bool:
 
 
 # METRICS & RECOMMENDATIONS
-def generate_ai_recommendations(insights, insightMetrics):
-    import os, requests, json, logging
+def generate_ai_recommendations(insights, insightMetrics, model_id=None):
+    """
+    Generates up to 4 personalized digital wellbeing recommendations using Hugging Face Router API.
 
-    logger = logging.getLogger(__name__)
+    Handles both chat models and text-generation models.
+    Automatically retries if the model is loading.
+    Returns a list of dicts: [{"text": "..."}]
+    """
 
+    # ------------------------------
+    # 1️⃣ Set defaults
+    # ------------------------------
     filtered_insights = [
-        i for i in insights
-        if i.get("translated") and i["translated"].strip()
-    ] or [{"translated": "User has short social media posts."}]
+        item for item in insights if item.get("translated") and item["translated"].strip()
+    ] or [{"translated": "User has a few short posts."}]
 
     prompt = f"""
-You analyze social media behavior.
+You are a friendly AI assistant analyzing social media behavior.
 
-Metrics:
+User insight metrics:
 {json.dumps(insightMetrics, indent=2)}
 
-Sample posts:
+Sample analyzed posts:
 {json.dumps(filtered_insights[:5], indent=2)}
 
-Generate exactly 4 digital wellbeing recommendations.
+Generate exactly 4 personalized digital wellbeing recommendations.
 Rules:
-- One sentence per line
-- Friendly, supportive
-- Actionable
+- One sentence each
+- Friendly and supportive tone
+- Actionable advice
 - No emojis
 - No numbering
-"""
+Return each recommendation on a new line.
+""".strip()
 
+    # ------------------------------
+    # 2️⃣ HF Token
+    # ------------------------------
     token = os.getenv("HUGGINGFACE_TOKEN")
     if not token:
-        logger.error("HUGGINGFACE_TOKEN missing")
+        logger.error("[HF] HUGGINGFACE_TOKEN missing")
         return []
 
-    model_id = "google/flan-t5-large"
-    api_url = f"https://api-inference.huggingface.co/models/{model_id}"
+    # ------------------------------
+    # 3️⃣ Default model if not provided
+    # ------------------------------
+    if not model_id:
+        # Chat model recommended
+        model_id = "tiiuae/falcon-7b-instruct"
+
+    # ------------------------------
+    # 4️⃣ Determine endpoint based on model type
+    # ------------------------------
+    chat_models = {"tiiuae/falcon-7b-instruct", "mistralai/Mistral-7B-Instruct-v0.3", "OpenAssistant/oasst-sft-1-pythia-12b"}
+    if model_id in chat_models:
+        endpoint = "https://router.huggingface.co/v1/chat/completions"
+        payload = {
+            "model": model_id,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "max_tokens": 200
+        }
+        parse_response = lambda r: r["choices"][0]["message"]["content"]
+    else:
+        # Text-generation models
+        endpoint = f"https://router.huggingface.co/v1/models/{model_id}"
+        payload = {
+            "inputs": prompt,
+            "parameters": {"temperature": 0.7, "max_new_tokens": 200}
+        }
+        parse_response = lambda r: r[0]["generated_text"]
 
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": 200,
-            "temperature": 0.7
-        }
-    }
+    # ------------------------------
+    # 5️⃣ Send request with retry if model is loading
+    # ------------------------------
+    for attempt in range(3):
+        try:
+            response = requests.post(endpoint, headers=headers, json=payload, timeout=60)
+            if response.status_code == 503:
+                # Model is loading
+                retry_after = 25
+                logger.warning(f"[HF] Model loading, retrying after {retry_after}s...")
+                time.sleep(retry_after)
+                continue
+            response.raise_for_status()
+            result = response.json()
+            text = parse_response(result)
+            break
+        except Exception as e:
+            logger.error(f"[HF] Request error: {e}")
+            if attempt == 2:
+                return []  # Give up after 3 attempts
 
-    try:
-        res = requests.post(api_url, headers=headers, json=payload, timeout=30)
-        res.raise_for_status()
-        result = res.json()
-
-        text = ""
-
-        if isinstance(result, list) and result:
-            item = result[0]
-            if isinstance(item, dict):
-                text = item.get("generated_text", "")
-        elif isinstance(result, dict):
-            text = result.get("generated_text", "")
-
-        if not text.strip():
-            logger.error("HF returned empty text")
-            return []
-
-        lines = [l.strip() for l in text.split("\n") if l.strip()]
-        return [{"text": l} for l in lines[:4]]
-
-    except Exception as e:
-        logger.error(f"HF recommendation error: {e}")
+    # ------------------------------
+    # 6️⃣ Parse recommendations
+    # ------------------------------
+    if not text or not text.strip():
+        logger.warning("[HF] Empty recommendation text")
         return []
+
+    recommendations = [
+        {"text": line.strip()} for line in text.split("\n") if line.strip()
+    ]
+
+    return recommendations[:4]
 
 def compute_insight_metrics(insights: list):
     total = max(len(insights), 1)
