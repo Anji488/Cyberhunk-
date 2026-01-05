@@ -1,6 +1,7 @@
 import re
 import logging
 import os
+import openai
 import random
 from datetime import datetime
 import json
@@ -242,14 +243,13 @@ def is_potential_misinformation(text: str) -> bool:
 
 
 # METRICS & RECOMMENDATIONS
-def generate_ai_recommendations(insights, insightMetrics, model_id=None):
+def generate_ai_recommendations_openai(insights, insightMetrics, model="gpt-3.5-turbo"):
     """
-    Generate up to 4 personalized digital wellbeing recommendations using Hugging Face Router API.
+    Generate up to 4 personalized digital wellbeing recommendations using OpenAI Chat API.
 
-    ✅ Supports chat models (Mistral-7B-Instruct-v0.2)
-    ✅ Automatically retries if the model is loading
-    ✅ Handles empty prompts safely
-    ✅ Returns a list of dicts [{"text": "..."}]
+    Uses gpt-3.5-turbo or any chat model
+    Handles empty prompts safely
+    Returns a list of dicts [{"text": "..."}]
     """
 
     # ------------------------------
@@ -263,10 +263,10 @@ def generate_ai_recommendations(insights, insightMetrics, model_id=None):
 You are a friendly AI assistant analyzing social media behavior.
 
 User insight metrics:
-{json.dumps(insightMetrics, indent=2)}
+{insightMetrics}
 
 Sample analyzed posts:
-{json.dumps(filtered_insights[:5], indent=2)}
+{filtered_insights[:5]}
 
 Generate exactly 4 personalized digital wellbeing recommendations.
 Rules:
@@ -279,60 +279,39 @@ Return each recommendation on a new line.
 """.strip()
 
     # ------------------------------
-    # 2️⃣ Hugging Face token
+    # 2️⃣ OpenAI API key
     # ------------------------------
-    token = os.getenv("HUGGINGFACE_TOKEN")
-    if not token:
-        logger.error("[HF] HUGGINGFACE_TOKEN missing")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if not openai_api_key:
+        logger.error("[OPENAI] OPENAI_API_KEY missing")
+        return []
+
+    openai.api_key = openai_api_key
+
+    # ------------------------------
+    # 3️⃣ Make the request
+    # ------------------------------
+    try:
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=200
+        )
+
+        text = response.choices[0].message.content
+
+    except Exception as e:
+        logger.error(f"[OPENAI] Request error: {e}")
         return []
 
     # ------------------------------
-    # 3️⃣ Default chat model
-    # ------------------------------
-    if not model_id:
-        model_id = "mistralai/Mistral-7B-Instruct-v0.2"  # free, chat-capable
-
-    # ------------------------------
-    # 4️⃣ Setup chat endpoint
-    # ------------------------------
-    endpoint = "https://router.huggingface.co/v1/chat/completions"
-    payload = {
-        "model": model_id,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
-        "max_tokens": 200
-    }
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-
-    # ------------------------------
-    # 5️⃣ Send request with retries
-    # ------------------------------
-    for attempt in range(3):
-        try:
-            response = requests.post(endpoint, headers=headers, json=payload, timeout=60)
-            if response.status_code == 503:
-                # Model is loading
-                retry_after = 25
-                logger.warning(f"[HF] Model loading, retrying after {retry_after}s...")
-                time.sleep(retry_after)
-                continue
-            response.raise_for_status()
-            result = response.json()
-            text = result["choices"][0]["message"]["content"]
-            break
-        except Exception as e:
-            logger.error(f"[HF] Request error: {e}")
-            if attempt == 2:
-                return []
-
-    # ------------------------------
-    # 6️⃣ Parse recommendations
+    # 4️⃣ Parse recommendations
     # ------------------------------
     if not text or not text.strip():
-        logger.warning("[HF] Empty recommendation text")
+        logger.warning("[OPENAI] Empty recommendation text")
         return []
 
     recommendations = [
@@ -340,6 +319,7 @@ Return each recommendation on a new line.
     ]
 
     return recommendations[:4]
+
 def compute_insight_metrics(insights: list):
     total = max(len(insights), 1)
 
