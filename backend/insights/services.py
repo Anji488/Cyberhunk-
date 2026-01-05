@@ -244,12 +244,31 @@ def is_potential_misinformation(text: str) -> bool:
 # METRICS & RECOMMENDATIONS
 def generate_ai_recommendations(insights, insightMetrics):
     """
-    Generates personalized digital wellbeing recommendations
-    via Hugging Face text-generation API.
+    Generates personalized digital wellbeing recommendations via Hugging Face API.
     
     Returns a list of dicts: [{"text": "..."}]
     """
+    import os
+    import requests
+    import json
+    import logging
 
+    logger = logging.getLogger(__name__)
+
+    # ------------------------------
+    # 1️⃣ Filter out empty posts
+    # ------------------------------
+    filtered_insights = [
+        item for item in insights 
+        if item.get("translated") and len(item["translated"].strip()) > 0
+    ]
+    if not filtered_insights:
+        # Ensure the AI always has something to work with
+        filtered_insights = [{"translated": "User has a few short posts."}]
+
+    # ------------------------------
+    # 2️⃣ Build the prompt
+    # ------------------------------
     prompt = f"""
 You are an AI assistant that analyzes social media behavior.
 
@@ -257,7 +276,7 @@ User insight metrics:
 {json.dumps(insightMetrics, indent=2)}
 
 Sample analyzed posts:
-{json.dumps(insights[:8], indent=2)}
+{json.dumps(filtered_insights[:8], indent=2)}
 
 Generate exactly 4 personalized digital wellbeing recommendations.
 Rules:
@@ -269,6 +288,9 @@ Rules:
 Return each recommendation on a new line.
 """
 
+    # ------------------------------
+    # 3️⃣ Hugging Face API setup
+    # ------------------------------
     model_id = "google/flan-t5-large"
     api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}"
     token = os.getenv("HUGGINGFACE_TOKEN")
@@ -291,35 +313,41 @@ Return each recommendation on a new line.
     }
 
     try:
+        # ------------------------------
+        # 4️⃣ Send request
+        # ------------------------------
+        logger.info("[AI RECOMMENDATION] Sending request to Hugging Face API")
         response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+        logger.info(f"[AI RECOMMENDATION] HF response status: {response.status_code}")
+
         response.raise_for_status()
 
-        # Log the raw response for debugging
-        logger.info(f"[HF RESPONSE {response.status_code}] {response.text}")
-
+        # ------------------------------
+        # 5️⃣ Parse response robustly
+        # ------------------------------
         result = response.json()
-        text = ""
+        logger.info(f"[AI RECOMMENDATION RAW RESPONSE] {json.dumps(result, indent=2)}")
 
-        # Robust parsing for different formats
+        text = ""
         if isinstance(result, list) and len(result) > 0:
-            # New HF text-generation format: [{"generated_text": "..."}] or [{"text": "..."}]
+            # [{"generated_text": "..."}] or [{"text": "..."}]
             text = result[0].get("generated_text") or result[0].get("text", "")
         elif isinstance(result, dict):
-            # Some older models return a dict
             text = result.get("generated_text") or result.get("text", "")
-        
+
         if not text:
             logger.error(f"[AI RECOMMENDATION EMPTY RESPONSE] {result}")
             return []
 
-        # Split into individual recommendations
+        # ------------------------------
+        # 6️⃣ Split lines and return
+        # ------------------------------
         recommendations = [
             {"text": line.strip()} 
             for line in text.split("\n") 
             if line.strip()
         ]
 
-        # Limit to 4 recommendations
         return recommendations[:4]
 
     except requests.exceptions.RequestException as e:
