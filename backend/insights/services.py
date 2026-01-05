@@ -359,7 +359,7 @@ def compute_insight_metrics(insights: list):
     ]
 
     # ✅ AI-GENERATED RECOMMENDATIONS
-    recommendations = generate_ai_recommendations(insights, insightMetrics)
+    recommendations = generate_ai_recommendations_openai(insights, insightMetrics)
 
     return insightMetrics, recommendations
 
