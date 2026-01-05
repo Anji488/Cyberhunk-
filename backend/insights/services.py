@@ -291,7 +291,7 @@ Return each recommendation on a new line.
     # ------------------------------
     # 3️⃣ Hugging Face API setup
     # ------------------------------
-    model_id = "google/flan-t5-large"
+    model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}"
     token = os.getenv("HUGGINGFACE_TOKEN")
 
