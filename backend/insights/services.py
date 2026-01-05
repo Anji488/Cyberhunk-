@@ -243,62 +243,40 @@ def is_potential_misinformation(text: str) -> bool:
 
 # METRICS & RECOMMENDATIONS
 def generate_ai_recommendations(insights, insightMetrics):
-    """
-    Generates personalized digital wellbeing recommendations via Hugging Face API.
-    
-    Returns a list of dicts: [{"text": "..."}]
-    """
-    import os
-    import requests
-    import json
-    import logging
+    import os, requests, json, logging
 
     logger = logging.getLogger(__name__)
 
-    # ------------------------------
-    # 1️⃣ Filter out empty posts
-    # ------------------------------
     filtered_insights = [
-        item for item in insights 
-        if item.get("translated") and len(item["translated"].strip()) > 0
-    ]
-    if not filtered_insights:
-        # Ensure the AI always has something to work with
-        filtered_insights = [{"translated": "User has a few short posts."}]
+        i for i in insights
+        if i.get("translated") and i["translated"].strip()
+    ] or [{"translated": "User has short social media posts."}]
 
-    # ------------------------------
-    # 2️⃣ Build the prompt
-    # ------------------------------
     prompt = f"""
-You are an AI assistant that analyzes social media behavior.
+You analyze social media behavior.
 
-User insight metrics:
+Metrics:
 {json.dumps(insightMetrics, indent=2)}
 
-Sample analyzed posts:
-{json.dumps(filtered_insights[:8], indent=2)}
+Sample posts:
+{json.dumps(filtered_insights[:5], indent=2)}
 
-Generate exactly 4 personalized digital wellbeing recommendations.
+Generate exactly 4 digital wellbeing recommendations.
 Rules:
-- One sentence each
-- Friendly and supportive tone
-- Actionable advice
+- One sentence per line
+- Friendly, supportive
+- Actionable
 - No emojis
 - No numbering
-Return each recommendation on a new line.
 """
 
-    # ------------------------------
-    # 3️⃣ Hugging Face API setup
-    # ------------------------------
+    token = os.getenv("HUGGINGFACE_TOKEN")
+    if not token:
+        logger.error("HUGGINGFACE_TOKEN missing")
+        return []
+
     model_id = "google/flan-t5-large"
     api_url = f"https://api-inference.huggingface.co/models/{model_id}"
-
-    token = os.getenv("HUGGINGFACE_TOKEN")
-
-    if not token:
-        logger.error("[HUGGINGFACE_TOKEN MISSING] Cannot generate AI recommendations")
-        return []
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -308,54 +286,34 @@ Return each recommendation on a new line.
     payload = {
         "inputs": prompt,
         "parameters": {
-            "temperature": 0.7,
-            "max_new_tokens": 200
+            "max_new_tokens": 200,
+            "temperature": 0.7
         }
     }
 
     try:
-        # ------------------------------
-        # 4️⃣ Send request
-        # ------------------------------
-        logger.info("[AI RECOMMENDATION] Sending request to Hugging Face API")
-        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
-        logger.info(f"[AI RECOMMENDATION] HF response status: {response.status_code}")
-
-        response.raise_for_status()
-
-        # ------------------------------
-        # 5️⃣ Parse response robustly
-        # ------------------------------
-        result = response.json()
-        logger.info(f"[AI RECOMMENDATION RAW RESPONSE] {json.dumps(result, indent=2)}")
+        res = requests.post(api_url, headers=headers, json=payload, timeout=30)
+        res.raise_for_status()
+        result = res.json()
 
         text = ""
-        if isinstance(result, list) and len(result) > 0:
-            # [{"generated_text": "..."}] or [{"text": "..."}]
-            text = result[0].get("generated_text") or result[0].get("text", "")
-        elif isinstance(result, dict):
-            text = result.get("generated_text") or result.get("text", "")
 
-        if not text:
-            logger.error(f"[AI RECOMMENDATION EMPTY RESPONSE] {result}")
+        if isinstance(result, list) and result:
+            item = result[0]
+            if isinstance(item, dict):
+                text = item.get("generated_text", "")
+        elif isinstance(result, dict):
+            text = result.get("generated_text", "")
+
+        if not text.strip():
+            logger.error("HF returned empty text")
             return []
 
-        # ------------------------------
-        # 6️⃣ Split lines and return
-        # ------------------------------
-        recommendations = [
-            {"text": line.strip()} 
-            for line in text.split("\n") 
-            if line.strip()
-        ]
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        return [{"text": l} for l in lines[:4]]
 
-        return recommendations[:4]
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"[AI RECOMMENDATION REQUEST ERROR] {e}")
-        return []
     except Exception as e:
-        logger.error(f"[AI RECOMMENDATION ERROR] {e}")
+        logger.error(f"HF recommendation error: {e}")
         return []
 
 def compute_insight_metrics(insights: list):
