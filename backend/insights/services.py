@@ -241,14 +241,15 @@ def is_potential_misinformation(text: str) -> bool:
     return False
 
 
-# =========================
-# 📊 METRICS & RECOMMENDATIONS
-# =========================
+# METRICS & RECOMMENDATIONS
 def generate_ai_recommendations(insights, insightMetrics):
     """
-    Uses Hugging Face text-generation model to produce personalized recommendations
-    based on the user's insights.
+    Generates personalized digital wellbeing recommendations
+    via Hugging Face text-generation API.
+    
+    Returns a list of dicts: [{"text": "..."}]
     """
+
     prompt = f"""
 You are an AI assistant that analyzes social media behavior.
 
@@ -293,17 +294,37 @@ Return each recommendation on a new line.
         response = requests.post(api_url, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
 
-        result = response.json()
-        text = result[0].get("generated_text", "")
+        # Log the raw response for debugging
+        logger.info(f"[HF RESPONSE {response.status_code}] {response.text}")
 
+        result = response.json()
+        text = ""
+
+        # Robust parsing for different formats
+        if isinstance(result, list) and len(result) > 0:
+            # New HF text-generation format: [{"generated_text": "..."}] or [{"text": "..."}]
+            text = result[0].get("generated_text") or result[0].get("text", "")
+        elif isinstance(result, dict):
+            # Some older models return a dict
+            text = result.get("generated_text") or result.get("text", "")
+        
+        if not text:
+            logger.error(f"[AI RECOMMENDATION EMPTY RESPONSE] {result}")
+            return []
+
+        # Split into individual recommendations
         recommendations = [
             {"text": line.strip()} 
             for line in text.split("\n") 
             if line.strip()
         ]
 
+        # Limit to 4 recommendations
         return recommendations[:4]
 
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[AI RECOMMENDATION REQUEST ERROR] {e}")
+        return []
     except Exception as e:
         logger.error(f"[AI RECOMMENDATION ERROR] {e}")
         return []
