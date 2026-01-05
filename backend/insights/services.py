@@ -13,6 +13,8 @@ from emoji import demojize, EMOJI_DATA
 from insights import hf_models as insight_models
 from insights.hf_models import map_sentiment_label
 
+print(os.getenv("HUGGINGFACE_TOKEN"))
+
 logger = logging.getLogger(__name__)
 
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
@@ -245,8 +247,8 @@ def is_potential_misinformation(text: str) -> bool:
 def generate_ai_recommendations(insights, insightMetrics):
     """
     Uses Hugging Face text-generation model to produce personalized recommendations
+    based on the user's insights.
     """
-
     prompt = f"""
 You are an AI assistant that analyzes social media behavior.
 
@@ -268,8 +270,14 @@ Return each recommendation on a new line.
 
     model_id = "google/flan-t5-large"
     api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}"
+    token = os.getenv("HUGGINGFACE_TOKEN")
+
+    if not token:
+        logger.error("[HUGGINGFACE_TOKEN MISSING] Cannot generate AI recommendations")
+        return []
+
     headers = {
-        "Authorization": f"Bearer {os.getenv('HUGGINGFACE_TOKEN')}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
@@ -283,31 +291,22 @@ Return each recommendation on a new line.
 
     try:
         response = requests.post(api_url, headers=headers, json=payload, timeout=30)
-
-        if response.status_code != 200:
-            raise Exception(response.text)
+        response.raise_for_status()
 
         result = response.json()
         text = result[0].get("generated_text", "")
 
-        recommendations = []
-        for line in text.split("\n"):
-            line = line.strip()
-            if line:
-                recommendations.append({"text": line})
+        recommendations = [
+            {"text": line.strip()} 
+            for line in text.split("\n") 
+            if line.strip()
+        ]
 
         return recommendations[:4]
 
     except Exception as e:
         logger.error(f"[AI RECOMMENDATION ERROR] {e}")
-
-        # Safe fallback (minimal, non-rule-based)
-        return [
-            {"text": "Maintain a balanced and positive tone in your online interactions."},
-            {"text": "Try to avoid posting frequently late at night to support healthy routines."},
-            {"text": "Be mindful when sharing personal or location-based information online."},
-            {"text": "Continue engaging respectfully with others on social platforms."},
-        ]
+        return []
 
 def compute_insight_metrics(insights: list):
     total = max(len(insights), 1)
