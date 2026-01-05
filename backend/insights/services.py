@@ -291,7 +291,7 @@ Return each recommendation on a new line.
     # ------------------------------
     # 3️⃣ Hugging Face API setup
     # ------------------------------
-    model_id = "mistralai/Mistral-7B-Instruct-v0.2"
+    model_id = "google/flan-t5-large"
     api_url = f"https://api-inference.huggingface.co/models/{model_id}"
 
     token = os.getenv("HUGGINGFACE_TOKEN")
@@ -309,23 +309,29 @@ Return each recommendation on a new line.
         "inputs": prompt,
         "parameters": {
             "temperature": 0.7,
-            "max_new_tokens": 200,
-            "return_full_text": False
+            "max_new_tokens": 200
         }
     }
 
     try:
+        # ------------------------------
+        # 4️⃣ Send request
+        # ------------------------------
         logger.info("[AI RECOMMENDATION] Sending request to Hugging Face API")
         response = requests.post(api_url, headers=headers, json=payload, timeout=30)
         logger.info(f"[AI RECOMMENDATION] HF response status: {response.status_code}")
 
         response.raise_for_status()
 
+        # ------------------------------
+        # 5️⃣ Parse response robustly
+        # ------------------------------
         result = response.json()
         logger.info(f"[AI RECOMMENDATION RAW RESPONSE] {json.dumps(result, indent=2)}")
 
         text = ""
         if isinstance(result, list) and len(result) > 0:
+            # [{"generated_text": "..."}] or [{"text": "..."}]
             text = result[0].get("generated_text") or result[0].get("text", "")
         elif isinstance(result, dict):
             text = result.get("generated_text") or result.get("text", "")
@@ -334,14 +340,16 @@ Return each recommendation on a new line.
             logger.error(f"[AI RECOMMENDATION EMPTY RESPONSE] {result}")
             return []
 
+        # ------------------------------
+        # 6️⃣ Split lines and return
+        # ------------------------------
         recommendations = [
-            {"text": line.strip()}
-            for line in text.split("\n")
+            {"text": line.strip()} 
+            for line in text.split("\n") 
             if line.strip()
         ]
 
         return recommendations[:4]
-
 
     except requests.exceptions.RequestException as e:
         logger.error(f"[AI RECOMMENDATION REQUEST ERROR] {e}")
