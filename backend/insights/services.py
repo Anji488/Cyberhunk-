@@ -2,6 +2,8 @@ import re
 import logging
 import random
 from datetime import datetime
+import json
+import requests
 
 import pytz
 from langdetect import detect, LangDetectException
@@ -239,6 +241,73 @@ def is_potential_misinformation(text: str) -> bool:
 # =========================
 # 📊 METRICS & RECOMMENDATIONS
 # =========================
+def generate_ai_recommendations(insights, insightMetrics):
+    """
+    Uses Hugging Face text-generation model to produce personalized recommendations
+    """
+
+    prompt = f"""
+You are an AI assistant that analyzes social media behavior.
+
+User insight metrics:
+{json.dumps(insightMetrics, indent=2)}
+
+Sample analyzed posts:
+{json.dumps(insights[:8], indent=2)}
+
+Generate exactly 4 personalized digital wellbeing recommendations.
+Rules:
+- One sentence each
+- Friendly and supportive tone
+- Actionable advice
+- No emojis
+- No numbering
+Return each recommendation on a new line.
+"""
+
+    model_id = "google/flan-t5-large"
+    api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}"
+    headers = {
+        "Authorization": f"Bearer {os.getenv('HUGGINGFACE_TOKEN')}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "temperature": 0.7,
+            "max_new_tokens": 200
+        }
+    }
+
+    try:
+        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+
+        if response.status_code != 200:
+            raise Exception(response.text)
+
+        result = response.json()
+        text = result[0].get("generated_text", "")
+
+        recommendations = []
+        for line in text.split("\n"):
+            line = line.strip()
+            if line:
+                recommendations.append({"text": line})
+
+        return recommendations[:4]
+
+    except Exception as e:
+        logger.error(f"[AI RECOMMENDATION ERROR] {e}")
+
+        # Safe fallback (minimal, non-rule-based)
+        return [
+            {"text": "Maintain a balanced and positive tone in your online interactions."},
+            {"text": "Try to avoid posting frequently late at night to support healthy routines."},
+            {"text": "Be mindful when sharing personal or location-based information online."},
+            {"text": "Continue engaging respectfully with others on social platforms."},
+        ]
+
 def compute_insight_metrics(insights: list):
     total = max(len(insights), 1)
 
@@ -277,53 +346,8 @@ def compute_insight_metrics(insights: list):
         {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
     ]
 
-    rec_pool = {
-        "positive_high": ["Your interactions are highly positive.", "Keep spreading positivity!"],
-        "positive_mid": ["Try sharing more uplifting content.", "Increase positive engagement."],
-        "positive_low": ["Focus on improving post positivity."],
-        "healthy": ["Great posting schedule.", "Healthy online habits."],
-        "unhealthy": ["Reduce late-night posting.", "Late posts can affect wellbeing."],
-        "privacy_good": ["Excellent privacy awareness.", "You share minimal sensitive info."],
-        "privacy_bad": ["Be cautious when sharing locations."],
-        "respect_high": ["Your communication is very respectful."],
-        "respect_mid": ["Some posts could be more respectful."],
-        "respect_low": ["Avoid harsh language and tone."],
-    }
-
-    recommendations = []
-
-    pos_pct = (sentiment_counts["positive"] / total) * 100
-    healthy_pct = 100 - (night_posts / total) * 100
-    privacy_pct = 100 - (location_mentions / total) * 100
-    respect_pct = (respectful_count / total) * 100
-
-    recommendations.append({
-        "text": random.choice(
-            rec_pool["positive_high"] if pos_pct >= 80 else
-            rec_pool["positive_mid"] if pos_pct >= 50 else
-            rec_pool["positive_low"]
-        )
-    })
-
-    recommendations.append({
-        "text": random.choice(
-            rec_pool["healthy"] if healthy_pct >= 80 else rec_pool["unhealthy"]
-        )
-    })
-
-    recommendations.append({
-        "text": random.choice(
-            rec_pool["privacy_good"] if privacy_pct >= 80 else rec_pool["privacy_bad"]
-        )
-    })
-
-    recommendations.append({
-        "text": random.choice(
-            rec_pool["respect_high"] if respect_pct >= 75 else
-            rec_pool["respect_mid"] if respect_pct >= 50 else
-            rec_pool["respect_low"]
-        )
-    })
+    # ✅ AI-GENERATED RECOMMENDATIONS
+    recommendations = generate_ai_recommendations(insights, insightMetrics)
 
     return insightMetrics, recommendations
 
