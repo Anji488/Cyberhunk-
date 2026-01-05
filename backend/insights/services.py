@@ -244,15 +244,16 @@ def is_potential_misinformation(text: str) -> bool:
 # METRICS & RECOMMENDATIONS
 def generate_ai_recommendations(insights, insightMetrics, model_id=None):
     """
-    Generates up to 4 personalized digital wellbeing recommendations using Hugging Face Router API.
+    Generate up to 4 personalized digital wellbeing recommendations using Hugging Face Router API.
 
-    Handles both chat models and text-generation models.
-    Automatically retries if the model is loading.
-    Returns a list of dicts: [{"text": "..."}]
+    ✅ Supports chat models (Mistral-7B-Instruct-v0.2)
+    ✅ Automatically retries if the model is loading
+    ✅ Handles empty prompts safely
+    ✅ Returns a list of dicts [{"text": "..."}]
     """
 
     # ------------------------------
-    # 1️⃣ Set defaults
+    # 1️⃣ Filter insights
     # ------------------------------
     filtered_insights = [
         item for item in insights if item.get("translated") and item["translated"].strip()
@@ -278,7 +279,7 @@ Return each recommendation on a new line.
 """.strip()
 
     # ------------------------------
-    # 2️⃣ HF Token
+    # 2️⃣ Hugging Face token
     # ------------------------------
     token = os.getenv("HUGGINGFACE_TOKEN")
     if not token:
@@ -286,41 +287,28 @@ Return each recommendation on a new line.
         return []
 
     # ------------------------------
-    # 3️⃣ Default model if not provided
+    # 3️⃣ Default chat model
     # ------------------------------
     if not model_id:
-        # Chat model recommended
-        model_id = "tiiuae/falcon-7b-instruct"
+        model_id = "mistralai/Mistral-7B-Instruct-v0.2"  # free, chat-capable
 
     # ------------------------------
-    # 4️⃣ Determine endpoint based on model type
+    # 4️⃣ Setup chat endpoint
     # ------------------------------
-    chat_models = {"tiiuae/falcon-7b-instruct", "mistralai/Mistral-7B-Instruct-v0.3", "OpenAssistant/oasst-sft-1-pythia-12b"}
-    if model_id in chat_models:
-        endpoint = "https://router.huggingface.co/v1/chat/completions"
-        payload = {
-            "model": model_id,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.7,
-            "max_tokens": 200
-        }
-        parse_response = lambda r: r["choices"][0]["message"]["content"]
-    else:
-        # Text-generation models
-        endpoint = f"https://router.huggingface.co/v1/models/{model_id}"
-        payload = {
-            "inputs": prompt,
-            "parameters": {"temperature": 0.7, "max_new_tokens": 200}
-        }
-        parse_response = lambda r: r[0]["generated_text"]
-
+    endpoint = "https://router.huggingface.co/v1/chat/completions"
+    payload = {
+        "model": model_id,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7,
+        "max_tokens": 200
+    }
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
     # ------------------------------
-    # 5️⃣ Send request with retry if model is loading
+    # 5️⃣ Send request with retries
     # ------------------------------
     for attempt in range(3):
         try:
@@ -333,12 +321,12 @@ Return each recommendation on a new line.
                 continue
             response.raise_for_status()
             result = response.json()
-            text = parse_response(result)
+            text = result["choices"][0]["message"]["content"]
             break
         except Exception as e:
             logger.error(f"[HF] Request error: {e}")
             if attempt == 2:
-                return []  # Give up after 3 attempts
+                return []
 
     # ------------------------------
     # 6️⃣ Parse recommendations
@@ -352,7 +340,6 @@ Return each recommendation on a new line.
     ]
 
     return recommendations[:4]
-
 def compute_insight_metrics(insights: list):
     total = max(len(insights), 1)
 
