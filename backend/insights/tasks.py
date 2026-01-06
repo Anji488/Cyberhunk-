@@ -14,26 +14,46 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
     logger.info(f"📝 Creating report | report_id={report_id}")
 
     try:
-        result = reports_collection.insert_one({
+        # 1️⃣ FETCH PROFILE FIRST (CRITICAL)
+        profile = fetch_profile(token)
+        if not profile or not profile.get("id"):
+            raise Exception("Unable to fetch Facebook profile")
+
+        profile_id = profile["id"]
+
+        # 2️⃣ PREVENT DUPLICATE COMPLETED REPORTS
+        existing = reports_collection.find_one({
+            "profile_id": profile_id,
+            "status": "completed"
+        })
+
+        if existing:
+            logger.info(
+                f"⚠️ Completed report already exists for profile_id={profile_id}"
+            )
+            return
+
+        # 3️⃣ INSERT REPORT (profile_id KNOWN)
+        reports_collection.insert_one({
             "report_id": report_id,
             "user_id": str(user_id) if user_id else None,
-            "profile_id": None,
+            "profile_id": profile_id,
             "status": "processing",
             "created_at": datetime.utcnow()
         })
 
-        logger.info(f"✅ DB INSERT SUCCESS | _id={result.inserted_id}")
+        logger.info("✅ Report record created")
 
-        profile = fetch_profile(token)
+        # 4️⃣ RUN ANALYSIS
         analysis = analyze_facebook_data(token, method, max_posts)
 
+        # 5️⃣ UPDATE REPORT
         reports_collection.update_one(
             {"report_id": report_id},
             {"$set": {
                 "status": "completed",
                 "completed_at": datetime.utcnow(),
                 "profile": profile,
-                "profile_id": profile.get("id") if profile else None,
                 "insights": analysis["insights"],
                 "insightMetrics": analysis["insightMetrics"],
                 "recommendations": analysis["recommendations"]

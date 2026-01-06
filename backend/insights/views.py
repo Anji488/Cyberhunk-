@@ -296,24 +296,29 @@ def request_report(request):
 
 @csrf_exempt
 def get_reports(request):
-    user_id = str(request.user.id)
     profile_id = request.GET.get("profile_id")
 
-    query = {}
-    if profile_id:
-        query["profile_id"] = profile_id
+    if not profile_id:
+        return JsonResponse({"reports": []})
 
-    reports = list(reports_collection.find(query).sort("created_at", -1))
+    reports = list(
+        reports_collection
+        .find({"profile_id": profile_id})
+        .sort("created_at", -1)
+    )
 
     for r in reports:
         r["_id"] = str(r["_id"])
+
     return JsonResponse({"reports": reports})
+
 
 @csrf_exempt
 def get_report(request, report_id):
-    report = reports_collection.find_one({"report_id": report_id, "user_id": str(request.user.id)})
+    report = reports_collection.find_one({"report_id": report_id})
     if not report:
         return JsonResponse({"error": "Report not found"}, status=404)
+
     report["_id"] = str(report["_id"])
     return JsonResponse(report)
 
