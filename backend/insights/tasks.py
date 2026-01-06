@@ -11,49 +11,39 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True)
 def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=None):
 
-    logger.info(f"📝 Attempting DB insert | report_id={report_id}")
-    # Step 1: Create report record
+    logger.info(f"📝 Creating report | report_id={report_id}")
+
     try:
-        reports_collection.insert_one({
+        result = reports_collection.insert_one({
             "report_id": report_id,
             "user_id": str(user_id) if user_id else None,
             "profile_id": None,
             "status": "processing",
             "created_at": datetime.utcnow()
         })
+
         logger.info(f"✅ DB INSERT SUCCESS | _id={result.inserted_id}")
-    except Exception as e:
-        logger.exception("❌ DB INSERT FAILED")
-        logger.error(f"Mongo insert failed: {e}")
-        return  # ❗ stop task completely
 
-    try:
-        # Step 2: Fetch profile + analyze
         profile = fetch_profile(token)
-        result = analyze_facebook_data(token, method, max_posts)
+        analysis = analyze_facebook_data(token, method, max_posts)
 
-        # Step 3: Update report
-        update = reports_collection.update_one(
+        reports_collection.update_one(
             {"report_id": report_id},
             {"$set": {
                 "status": "completed",
                 "completed_at": datetime.utcnow(),
                 "profile": profile,
                 "profile_id": profile.get("id") if profile else None,
-                "insights": result.get("insights", []),
-                "insightMetrics": result.get("insightMetrics", []),
-                "recommendations": result.get("recommendations", []),
+                "insights": analysis["insights"],
+                "insightMetrics": analysis["insightMetrics"],
+                "recommendations": analysis["recommendations"]
             }}
         )
 
-        logger.info(
-            f"📌 DB UPDATE | report_id={report_id} "
-            f"matched={update.matched_count} modified={update.modified_count}"
-        )
-
+        logger.info(f"✅ Report completed | report_id={report_id}")
 
     except Exception as e:
-        logger.exception("Report generation failed")
+        logger.exception("❌ Report generation failed")
 
         reports_collection.update_one(
             {"report_id": report_id},
