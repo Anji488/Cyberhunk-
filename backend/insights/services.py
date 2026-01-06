@@ -1,7 +1,6 @@
 import re
 import logging
 import os
-import openai
 import random
 from datetime import datetime
 import json
@@ -10,6 +9,8 @@ import requests
 import pytz
 from langdetect import detect, LangDetectException
 from emoji import demojize, EMOJI_DATA
+
+from openai import OpenAI
 
 from insights import hf_models as insight_models
 from insights.hf_models import map_sentiment_label
@@ -243,79 +244,54 @@ def is_potential_misinformation(text: str) -> bool:
 
 
 # METRICS & RECOMMENDATIONS
-def generate_ai_recommendations_openai(insights, insightMetrics, model="gpt-3.5-turbo"):
-    """
-    Generate up to 4 personalized digital wellbeing recommendations using OpenAI Chat API.
+def generate_ai_recommendations_openai(insights, insightMetrics):
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    Uses gpt-3.5-turbo or any chat model
-    Handles empty prompts safely
-    Returns a list of dicts [{"text": "..."}]
-    """
-
-    # ------------------------------
-    # 1️⃣ Filter insights
-    # ------------------------------
     filtered_insights = [
-        item for item in insights if item.get("translated") and item["translated"].strip()
+        item for item in insights
+        if item.get("translated") and item["translated"].strip()
     ] or [{"translated": "User has a few short posts."}]
 
     prompt = f"""
 You are a friendly AI assistant analyzing social media behavior.
 
 User insight metrics:
-{insightMetrics}
+{json.dumps(insightMetrics, indent=2)}
 
 Sample analyzed posts:
-{filtered_insights[:5]}
+{json.dumps(filtered_insights[:5], indent=2)}
 
 Generate exactly 4 personalized digital wellbeing recommendations.
+
 Rules:
 - One sentence each
-- Friendly and supportive tone
-- Actionable advice
+- Friendly and supportive
+- Actionable
 - No emojis
 - No numbering
-Return each recommendation on a new line.
-""".strip()
+- One recommendation per line
+"""
 
-    # ------------------------------
-    # 2️⃣ OpenAI API key
-    # ------------------------------
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        logger.error("[OPENAI] OPENAI_API_KEY missing")
-        return []
-
-    openai.api_key = openai_api_key
-
-    # ------------------------------
-    # 3️⃣ Make the request
-    # ------------------------------
     try:
-        response = openai.ChatCompletion.create(
-            model=model,
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",   # ✅ cheaper & faster
             messages=[
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=200
+            max_tokens=200,
         )
 
-        text = response.choices[0].message.content
+        text = response.choices[0].message.content.strip()
 
     except Exception as e:
-        logger.error(f"[OPENAI] Request error: {e}")
-        return []
-
-    # ------------------------------
-    # 4️⃣ Parse recommendations
-    # ------------------------------
-    if not text or not text.strip():
-        logger.warning("[OPENAI] Empty recommendation text")
+        logger.error(f"[OPENAI ERROR] {e}")
         return []
 
     recommendations = [
-        {"text": line.strip()} for line in text.split("\n") if line.strip()
+        {"text": line.strip()}
+        for line in text.split("\n")
+        if line.strip()
     ]
 
     return recommendations[:4]
