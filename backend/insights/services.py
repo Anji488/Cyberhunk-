@@ -127,7 +127,7 @@ def analyze_text(text: str, method="ml") -> dict:
                     score = float(data.get("score", 0))
                     mapped = map_sentiment_label(raw_label)
 
-                    label = mapped if score >= 0.6 else "neutral"
+                    label = mapped if score >= 0.5 else mapped
             except Exception as e:
                 logger.error(f"[SENTIMENT ERROR] {e}")
 
