@@ -3,7 +3,6 @@ import axios from "axios";
 import AnalyzeToken from "../components/AnalyzeToken";
 import * as htmlToImage from "html-to-image";
 import download from "downloadjs";
-import { Share2, Download } from "lucide-react";
 
 const BACKEND_URL = "https://cyberhunk.onrender.com";
 
@@ -16,9 +15,6 @@ export default function ReportsPage({ token }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const reportRef = useRef(null);
 
-  // -----------------------------
-  // Fetch reports
-  // -----------------------------
   useEffect(() => {
     const fetchReports = async () => {
       if (!profile?.id) {
@@ -43,8 +39,7 @@ export default function ReportsPage({ token }) {
             (a, b) => new Date(b.created_at) - new Date(a.created_at)
           )
         );
-      } catch (err) {
-        console.error(err);
+      } catch {
         setError("Failed to load reports.");
       } finally {
         setLoading(false);
@@ -54,9 +49,6 @@ export default function ReportsPage({ token }) {
     fetchReports();
   }, [profile?.id]);
 
-  // -----------------------------
-  // Fetch single report
-  // -----------------------------
   const fetchReport = async (reportId) => {
     setLoading(true);
     setError(null);
@@ -68,26 +60,19 @@ export default function ReportsPage({ token }) {
       );
       setSelectedReport(res.data);
       setIsModalOpen(true);
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError("Unable to load report.");
     } finally {
       setLoading(false);
     }
   };
 
-  // -----------------------------
-  // Download report
-  // -----------------------------
   const downloadReport = async () => {
     if (!reportRef.current) return;
     const dataUrl = await htmlToImage.toPng(reportRef.current);
     download(dataUrl, `report_${selectedReport.report_id}.png`);
   };
 
-  // -----------------------------
-  // Share report
-  // -----------------------------
   const shareReport = async () => {
     if (!reportRef.current) return;
 
@@ -106,194 +91,171 @@ export default function ReportsPage({ token }) {
     }
   };
 
-  // -----------------------------
-  // Close modal on outside click
-  // -----------------------------
   const closeOnBackdrop = (e) => {
     if (e.target.id === "modal-backdrop") {
       setIsModalOpen(false);
     }
   };
 
-  // -----------------------------
-  // Render
-  // -----------------------------
   return (
-    <div className="max-w-6xl mx-auto p-6 min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50">
-      {!profile && (
-        <AnalyzeToken
-          token={token}
-          onInsightsFetched={(data) => setProfile(data.profile)}
-        />
-      )}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 px-4 sm:px-6 py-8">
+      <div className="max-w-6xl mx-auto">
+        {!profile && (
+          <AnalyzeToken
+            token={token}
+            onInsightsFetched={(data) => setProfile(data.profile)}
+          />
+        )}
 
-      {loading && <p className="text-gray-500">Loading...</p>}
-      {error && <p className="text-red-600 font-bold">{error}</p>}
+        {loading && <p className="text-gray-500 mt-4">Loading…</p>}
+        {error && <p className="text-red-600 font-medium mt-4">{error}</p>}
 
-      {/* -----------------------------
-          Cartoon Report Cards
-      ----------------------------- */}
-      {!loading && reports.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-3xl font-extrabold mb-6 text-indigo-600">
-            Past Reports
-          </h2>
+        {!loading && reports.length > 0 && (
+          <div className="mt-10">
+            <h2 className="text-2xl sm:text-3xl font-bold text-indigo-700 mb-6">
+              Past Reports
+            </h2>
 
-          <div className="grid gap-4">
-            {reports.map((r) => (
-              <div
-                key={r.report_id}
-                className="bg-gradient-to-r from-white to-indigo-50
-                           rounded-2xl p-5 shadow-md
-                           hover:shadow-xl hover:-translate-y-1
-                           transition-all duration-300
-                           flex items-center justify-between"
-              >
-                <div>
-                  <p className="font-bold text-gray-800 truncate max-w-xs">
-                    {r.report_id}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {new Date(r.created_at).toLocaleString()}
-                  </p>
-                </div>
-
-                <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold">
-                  {r.status || "Completed"}
-                </span>
-
-                <button
-                  onClick={() => fetchReport(r.report_id)}
-                  className="ml-4 bg-indigo-500 hover:bg-indigo-600
-                             text-white px-5 py-2 rounded-xl
-                             font-semibold shadow transition"
+            <div className="grid gap-4">
+              {reports.map((r) => (
+                <div
+                  key={r.report_id}
+                  className="bg-white rounded-2xl p-5 shadow-sm
+                             hover:shadow-md transition
+                             flex flex-col sm:flex-row
+                             sm:items-center sm:justify-between gap-4"
                 >
-                  View 
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* -----------------------------
-          Animated Modal
-      ----------------------------- */}
-      {isModalOpen && selectedReport && (
-        <div
-          id="modal-backdrop"
-          onClick={closeOnBackdrop}
-          className="fixed inset-0 z-50 flex items-center justify-center
-                     bg-gradient-to-br from-indigo-300/40 via-purple-300/40 to-pink-300/40
-                     backdrop-blur-sm p-4"
-        >
-          <div className="relative bg-white/90 backdrop-blur-xl
-                          rounded-3xl shadow-2xl
-                          max-w-3xl w-full p-8
-                          animate-scaleIn">
-            {/* Close */}
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="absolute -top-4 -right-4
-                         bg-red-500 hover:bg-red-600
-                         text-white w-10 h-10 rounded-full
-                         flex items-center justify-center
-                         shadow-lg text-lg"
-            >
-              ✖
-            </button>
-
-            {/* Export Area */}
-            <div
-              ref={reportRef}
-              className="space-y-6 p-6 bg-gradient-to-br
-                         from-indigo-50 to-purple-50 rounded-2xl"
-            >
-              {/* Profile */}
-              {selectedReport.profile && (
-                <div className="flex items-center gap-4">
-                  <img
-                    src={selectedReport.profile.picture?.data?.url}
-                    alt="Profile"
-                    className="w-20 h-20 rounded-full border-4 border-indigo-300 shadow"
-                  />
-                  <div>
-                    <p className="font-bold text-xl">
-                      {selectedReport.profile.name}
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-800 truncate">
+                      {r.report_id}
                     </p>
-                    <p className="text-sm text-gray-600">
-                      {selectedReport.profile.birthday || "N/A"}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {selectedReport.profile.gender || "N/A"}
+                    <p className="text-sm text-gray-500">
+                      {new Date(r.created_at).toLocaleString()}
                     </p>
                   </div>
-                </div>
-              )}
 
-              {/* Metrics */}
-              {selectedReport.insightMetrics?.length > 0 && (
-                <div>
-                  <h3 className="font-bold text-lg text-indigo-600 mb-2">
-                    Insight Metrics
-                  </h3>
-                  <ul className="grid grid-cols-2 gap-3">
-                    {selectedReport.insightMetrics.map((m, i) => (
-                      <li
-                        key={i}
-                        className="bg-white rounded-xl p-3 shadow text-gray-700 font-semibold"
-                      >
-                        {m.title} – {m.value}%
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                  <div className="flex items-center gap-3">
+                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-sm font-medium">
+                      {r.status || "Completed"}
+                    </span>
 
-              {/* Recommendations */}
-              {selectedReport.recommendations?.length > 0 && (
-                <div>
-                  <h3 className="font-bold text-lg text-purple-600 mb-2">
-                    💡 Recommendations
-                  </h3>
-                  <ul className="space-y-2">
-                    {selectedReport.recommendations.map((r, i) => (
-                      <li
-                        key={i}
-                        className="bg-white rounded-xl p-3 shadow text-gray-700"
-                      >
-                        👉 {r.text || r}
-                      </li>
-                    ))}
-                  </ul>
+                    <button
+                      onClick={() => fetchReport(r.report_id)}
+                      className="bg-indigo-600 hover:bg-indigo-700
+                                 text-white px-5 py-2 rounded-xl
+                                 text-sm font-semibold transition"
+                    >
+                      View Report
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-
-            {/* Buttons */}
-            <div className="mt-6 flex justify-end gap-4">
-              <button
-                onClick={shareReport}
-                className="flex items-center gap-2
-                           bg-gradient-to-r from-purple-500 to-pink-500
-                           text-white px-5 py-2 rounded-xl
-                           font-semibold shadow hover:scale-105 transition"
-              >
-                <Share2 className="w-5 h-5" /> Share
-              </button>
-              <button
-                onClick={downloadReport}
-                className="flex items-center gap-2
-                           bg-gradient-to-r from-indigo-500 to-blue-500
-                           text-white px-5 py-2 rounded-xl
-                           font-semibold shadow hover:scale-105 transition"
-              >
-                <Download className="w-5 h-5" /> Download
-              </button>
+              ))}
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {isModalOpen && selectedReport && (
+          <div
+            id="modal-backdrop"
+            onClick={closeOnBackdrop}
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm
+                       flex items-center justify-center p-4"
+          >
+            <div className="bg-white w-full max-w-3xl rounded-3xl shadow-xl
+                            max-h-[90vh] overflow-y-auto p-6 sm:p-8 relative">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="absolute top-4 right-4
+                           text-gray-500 hover:text-gray-800
+                           text-xl font-bold"
+              >
+                ×
+              </button>
+
+              <div
+                ref={reportRef}
+                className="space-y-6 bg-slate-50 rounded-2xl p-5 sm:p-6"
+              >
+                {selectedReport.profile && (
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <img
+                      src={selectedReport.profile.picture?.data?.url}
+                      alt="Profile"
+                      className="w-20 h-20 rounded-full object-cover border"
+                    />
+                    <div className="text-center sm:text-left">
+                      <p className="text-lg font-semibold">
+                        {selectedReport.profile.name}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {selectedReport.profile.birthday || "N/A"} ·{" "}
+                        {selectedReport.profile.gender || "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedReport.insightMetrics?.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-indigo-700 mb-3">
+                      Insight Metrics
+                    </h3>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {selectedReport.insightMetrics.map((m, i) => (
+                        <li
+                          key={i}
+                          className="bg-white rounded-xl p-3 shadow-sm
+                                     text-gray-700 font-medium"
+                        >
+                          {m.title} — {m.value}%
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {selectedReport.recommendations?.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-purple-700 mb-3">
+                      Recommendations
+                    </h3>
+                    <ul className="space-y-2">
+                      {selectedReport.recommendations.map((r, i) => (
+                        <li
+                          key={i}
+                          className="bg-white rounded-xl p-3 shadow-sm
+                                     text-gray-700"
+                        >
+                          {r.text || r}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3">
+                <button
+                  onClick={shareReport}
+                  className="bg-purple-600 hover:bg-purple-700
+                             text-white px-5 py-2 rounded-xl
+                             font-semibold transition"
+                >
+                  Share
+                </button>
+                <button
+                  onClick={downloadReport}
+                  className="bg-indigo-600 hover:bg-indigo-700
+                             text-white px-5 py-2 rounded-xl
+                             font-semibold transition"
+                >
+                  Download
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
