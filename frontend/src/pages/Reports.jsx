@@ -21,6 +21,7 @@ export default function ReportsPage({ token }) {
 
   const reportRef = useRef(null);
 
+  // Fetch reports
   useEffect(() => {
     const fetchReports = async () => {
       if (!profile?.id) {
@@ -46,19 +47,17 @@ export default function ReportsPage({ token }) {
     fetchReports();
   }, [profile?.id]);
 
+  // Filter + Sort
   const processedReports = useMemo(() => {
     let list = [...reports];
-
     if (statusFilter !== "all") {
       list = list.filter((r) => (r.status || "Completed") === statusFilter);
     }
-
     list.sort((a, b) =>
       sortOrder === "newest"
         ? new Date(b.created_at) - new Date(a.created_at)
         : new Date(a.created_at) - new Date(b.created_at)
     );
-
     return list;
   }, [reports, statusFilter, sortOrder]);
 
@@ -83,8 +82,27 @@ export default function ReportsPage({ token }) {
   };
 
   const downloadReport = async () => {
+    if (!reportRef.current) return;
     const dataUrl = await htmlToImage.toPng(reportRef.current);
     download(dataUrl, `report_${selectedReport.report_id}.png`);
+  };
+
+  const shareReport = async () => {
+    if (!reportRef.current) return;
+
+    const dataUrl = await htmlToImage.toPng(reportRef.current);
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], "report.png", { type: blob.type });
+
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({
+        title: "Report",
+        text: "Check out this report!",
+        files: [file],
+      });
+    } else {
+      alert("Sharing not supported. Please download instead.");
+    }
   };
 
   const closeOnBackdrop = (e) => {
@@ -101,13 +119,11 @@ export default function ReportsPage({ token }) {
           />
         )}
 
-        {/* Header */}
+        {/* Header + Filters */}
         <div className="mt-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h2 className="text-2xl sm:text-3xl font-bold text-indigo-700">
             Past Reports
           </h2>
-
-          {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
             <select
               value={statusFilter}
@@ -120,7 +136,6 @@ export default function ReportsPage({ token }) {
               <option value="all">All Status</option>
               <option value="Completed">Completed</option>
             </select>
-
             <select
               value={sortOrder}
               onChange={(e) => {
@@ -135,7 +150,7 @@ export default function ReportsPage({ token }) {
           </div>
         </div>
 
-        {/* Report List */}
+        {/* Report Cards */}
         <div className="mt-6 space-y-4">
           {paginatedReports.map((r) => (
             <div
@@ -210,7 +225,7 @@ export default function ReportsPage({ token }) {
             onClick={closeOnBackdrop}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
-            <div className="bg-white max-w-3xl w-full rounded-3xl p-6 shadow-xl max-h-[90vh] overflow-y-auto relative">
+            <div className="bg-white w-full max-w-3xl rounded-3xl shadow-xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto relative">
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="absolute top-4 right-4 text-xl text-gray-500"
@@ -218,25 +233,83 @@ export default function ReportsPage({ token }) {
                 ×
               </button>
 
-              <div ref={reportRef} className="space-y-6 bg-slate-50 p-6 rounded-2xl">
-                <h3 className="text-xl font-bold text-indigo-700">
-                  Report Details
-                </h3>
-
-                {selectedReport.insightMetrics?.map((m, i) => (
-                  <div
-                    key={i}
-                    className="bg-white p-3 rounded-xl shadow-sm"
-                  >
-                    {m.title} — {m.value}%
+              {/* Export Area */}
+              <div
+                ref={reportRef}
+                className="space-y-6 p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl"
+              >
+                {/* Profile */}
+                {selectedReport.profile && (
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <img
+                      src={selectedReport.profile.picture?.data?.url}
+                      alt="Profile"
+                      className="w-20 h-20 rounded-full border-4 border-indigo-300 shadow"
+                    />
+                    <div className="text-center sm:text-left">
+                      <p className="font-bold text-xl">
+                        {selectedReport.profile.name}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {selectedReport.profile.birthday || "N/A"}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {selectedReport.profile.gender || "N/A"}
+                      </p>
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {/* Metrics */}
+                {selectedReport.insightMetrics?.length > 0 && (
+                  <div>
+                    <h3 className="font-bold text-lg text-indigo-600 mb-2">
+                      Insight Metrics
+                    </h3>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {selectedReport.insightMetrics.map((m, i) => (
+                        <li
+                          key={i}
+                          className="bg-white rounded-xl p-3 shadow text-gray-700 font-semibold"
+                        >
+                          {m.title} — {m.value}%
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {selectedReport.recommendations?.length > 0 && (
+                  <div>
+                    <h3 className="font-bold text-lg text-purple-600 mb-2">
+                      Recommendations
+                    </h3>
+                    <ul className="space-y-2">
+                      {selectedReport.recommendations.map((r, i) => (
+                        <li
+                          key={i}
+                          className="bg-white rounded-xl p-3 shadow text-gray-700"
+                        >
+                          {r.text || r}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
-              <div className="mt-6 flex justify-end">
+              {/* Buttons */}
+              <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3">
+                <button
+                  onClick={shareReport}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl font-semibold"
+                >
+                  Share
+                </button>
                 <button
                   onClick={downloadReport}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-semibold"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl font-semibold"
                 >
                   Download
                 </button>
