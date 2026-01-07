@@ -3,9 +3,10 @@ import axios from "axios";
 import AnalyzeToken from "../components/AnalyzeToken";
 import * as htmlToImage from "html-to-image";
 import download from "downloadjs";
-import { Share2, Download } from "lucide-react";
+import { Share2, Download, ChevronLeft, ChevronRight } from "lucide-react";
 
 const BACKEND_URL = "https://cyberhunk.onrender.com";
+const PAGE_SIZE = 5; // 👈 change if needed
 
 export default function ReportsPage({ token }) {
   const [profile, setProfile] = useState(null);
@@ -14,6 +15,8 @@ export default function ReportsPage({ token }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
   const reportRef = useRef(null);
 
   // -----------------------------
@@ -21,31 +24,22 @@ export default function ReportsPage({ token }) {
   // -----------------------------
   useEffect(() => {
     const fetchReports = async () => {
-      if (!profile?.id) {
-        setReports([]);
-        setSelectedReport(null);
-        setLoading(false);
-        return;
-      }
+      if (!profile?.id) return;
 
       setLoading(true);
-      setError(null);
-
       try {
         const res = await axios.get(`${BACKEND_URL}/insights/reports/`, {
           params: { profile_id: String(profile.id) },
           withCredentials: true,
         });
 
-        const list = res.data?.reports || [];
-        setReports(
-          list.sort(
-            (a, b) => new Date(b.created_at) - new Date(a.created_at)
-          )
+        const sorted = (res.data?.reports || []).sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
         );
+
+        setReports(sorted);
       } catch (err) {
-        console.error(err);
-        setError("Failed to load reports.");
+        setError("Failed to load reports");
       } finally {
         setLoading(false);
       }
@@ -55,99 +49,84 @@ export default function ReportsPage({ token }) {
   }, [profile?.id]);
 
   // -----------------------------
+  // Pagination
+  // -----------------------------
+  const totalPages = Math.ceil(reports.length / PAGE_SIZE);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const paginatedReports = reports.slice(start, start + PAGE_SIZE);
+
+  // -----------------------------
   // Fetch single report
   // -----------------------------
-  const fetchReport = async (reportId) => {
-    setLoading(true);
-    setError(null);
-
+  const fetchReport = async (id) => {
     try {
       const res = await axios.get(
-        `${BACKEND_URL}/insights/reports/${reportId}/`,
+        `${BACKEND_URL}/insights/reports/${id}/`,
         { withCredentials: true }
       );
       setSelectedReport(res.data);
       setIsModalOpen(true);
-    } catch (err) {
-      console.error(err);
-      setError("Unable to load report.");
-    } finally {
-      setLoading(false);
+    } catch {
+      setError("Unable to load report");
     }
   };
 
   // -----------------------------
-  // Download report
+  // Download / Share
   // -----------------------------
   const downloadReport = async () => {
-    if (!reportRef.current) return;
     const dataUrl = await htmlToImage.toPng(reportRef.current);
     download(dataUrl, `report_${selectedReport.report_id}.png`);
   };
 
-  // -----------------------------
-  // Share report
-  // -----------------------------
   const shareReport = async () => {
-    if (!reportRef.current) return;
-
     const dataUrl = await htmlToImage.toPng(reportRef.current);
     const blob = await (await fetch(dataUrl)).blob();
     const file = new File([blob], "report.png", { type: blob.type });
 
     if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({
-        title: "Report",
-        text: "Check out this report!",
-        files: [file],
-      });
+      navigator.share({ title: "Report", files: [file] });
     } else {
-      alert("Sharing not supported. Please download instead.");
+      alert("Sharing not supported");
     }
   };
 
   // -----------------------------
-  // Close modal on outside click
+  // Close modal on backdrop
   // -----------------------------
   const closeOnBackdrop = (e) => {
-    if (e.target.id === "modal-backdrop") {
-      setIsModalOpen(false);
-    }
+    if (e.target.id === "modal-backdrop") setIsModalOpen(false);
   };
 
   // -----------------------------
   // Render
   // -----------------------------
   return (
-    <div className="max-w-6xl mx-auto p-6 min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 p-4 sm:p-8">
       {!profile && (
-        <AnalyzeToken
-          token={token}
-          onInsightsFetched={(data) => setProfile(data.profile)}
-        />
+        <AnalyzeToken token={token} onInsightsFetched={(d) => setProfile(d.profile)} />
       )}
 
       {loading && <p className="text-gray-500">Loading...</p>}
       {error && <p className="text-red-600 font-bold">{error}</p>}
 
       {/* -----------------------------
-          Cartoon Report Cards
+          Reports List
       ----------------------------- */}
-      {!loading && reports.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-3xl font-extrabold mb-6 text-indigo-600">
+      {!loading && paginatedReports.length > 0 && (
+        <>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-indigo-600 mb-6">
             📊 Past Reports
           </h2>
 
+          {/* Cards */}
           <div className="grid gap-4">
-            {reports.map((r) => (
+            {paginatedReports.map((r) => (
               <div
                 key={r.report_id}
-                className="bg-gradient-to-r from-white to-indigo-50
-                           rounded-2xl p-5 shadow-md
-                           hover:shadow-xl hover:-translate-y-1
-                           transition-all duration-300
-                           flex items-center justify-between"
+                className="bg-white rounded-2xl shadow-md p-4 sm:p-6
+                           flex flex-col sm:flex-row sm:items-center
+                           justify-between gap-4 hover:shadow-xl transition"
               >
                 <div>
                   <p className="font-bold text-gray-800 truncate max-w-xs">
@@ -158,137 +137,97 @@ export default function ReportsPage({ token }) {
                   </p>
                 </div>
 
-                <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold">
-                  {r.status || "Completed"}
-                </span>
-
-                <button
-                  onClick={() => fetchReport(r.report_id)}
-                  className="ml-4 bg-indigo-500 hover:bg-indigo-600
-                             text-white px-5 py-2 rounded-xl
-                             font-semibold shadow transition"
-                >
-                  View ✨
-                </button>
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1 text-sm rounded-full bg-green-100 text-green-700 font-semibold">
+                    {r.status || "Completed"}
+                  </span>
+                  <button
+                    onClick={() => fetchReport(r.report_id)}
+                    className="bg-indigo-500 hover:bg-indigo-600
+                               text-white px-4 py-2 rounded-xl font-semibold"
+                  >
+                    View ✨
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-        </div>
+
+          {/* Pagination */}
+          <div className="mt-6 flex justify-center items-center gap-4">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+              className="p-2 rounded-full bg-white shadow disabled:opacity-40"
+            >
+              <ChevronLeft />
+            </button>
+
+            <span className="font-semibold text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+              className="p-2 rounded-full bg-white shadow disabled:opacity-40"
+            >
+              <ChevronRight />
+            </button>
+          </div>
+        </>
       )}
 
       {/* -----------------------------
-          Animated Modal
+          Responsive Modal
       ----------------------------- */}
       {isModalOpen && selectedReport && (
         <div
           id="modal-backdrop"
           onClick={closeOnBackdrop}
           className="fixed inset-0 z-50 flex items-center justify-center
-                     bg-gradient-to-br from-indigo-300/40 via-purple-300/40 to-pink-300/40
-                     backdrop-blur-sm p-4"
+                     bg-black/40 backdrop-blur-sm p-4"
         >
-          <div className="relative bg-white/90 backdrop-blur-xl
-                          rounded-3xl shadow-2xl
-                          max-w-3xl w-full p-8
-                          animate-scaleIn">
-            {/* Close */}
+          <div className="relative bg-white rounded-3xl shadow-2xl
+                          w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute -top-4 -right-4
-                         bg-red-500 hover:bg-red-600
-                         text-white w-10 h-10 rounded-full
-                         flex items-center justify-center
-                         shadow-lg text-lg"
+              className="absolute top-3 right-3 bg-red-500 text-white
+                         w-9 h-9 rounded-full flex items-center justify-center"
             >
               ✖
             </button>
 
-            {/* Export Area */}
-            <div
-              ref={reportRef}
-              className="space-y-6 p-6 bg-gradient-to-br
-                         from-indigo-50 to-purple-50 rounded-2xl"
-            >
-              {/* Profile */}
-              {selectedReport.profile && (
-                <div className="flex items-center gap-4">
-                  <img
-                    src={selectedReport.profile.picture?.data?.url}
-                    alt="Profile"
-                    className="w-20 h-20 rounded-full border-4 border-indigo-300 shadow"
-                  />
-                  <div>
-                    <p className="font-bold text-xl">
-                      {selectedReport.profile.name}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      🎂 {selectedReport.profile.birthday || "N/A"}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      ⚧ {selectedReport.profile.gender || "N/A"}
-                    </p>
-                  </div>
-                </div>
-              )}
+            <div ref={reportRef} className="space-y-6">
+              <h3 className="text-xl font-bold text-indigo-600">
+                📄 Report Details
+              </h3>
 
-              {/* Metrics */}
               {selectedReport.insightMetrics?.length > 0 && (
-                <div>
-                  <h3 className="font-bold text-lg text-indigo-600 mb-2">
-                    📈 Insight Metrics
-                  </h3>
-                  <ul className="grid grid-cols-2 gap-3">
-                    {selectedReport.insightMetrics.map((m, i) => (
-                      <li
-                        key={i}
-                        className="bg-white rounded-xl p-3 shadow text-gray-700 font-semibold"
-                      >
-                        {m.title} – {m.value}%
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Recommendations */}
-              {selectedReport.recommendations?.length > 0 && (
-                <div>
-                  <h3 className="font-bold text-lg text-purple-600 mb-2">
-                    💡 Recommendations
-                  </h3>
-                  <ul className="space-y-2">
-                    {selectedReport.recommendations.map((r, i) => (
-                      <li
-                        key={i}
-                        className="bg-white rounded-xl p-3 shadow text-gray-700"
-                      >
-                        👉 {r.text || r}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {selectedReport.insightMetrics.map((m, i) => (
+                    <div key={i} className="bg-indigo-50 rounded-xl p-3 font-semibold">
+                      {m.title} – {m.value}%
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Buttons */}
-            <div className="mt-6 flex justify-end gap-4">
+            <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3">
               <button
                 onClick={shareReport}
-                className="flex items-center gap-2
-                           bg-gradient-to-r from-purple-500 to-pink-500
-                           text-white px-5 py-2 rounded-xl
-                           font-semibold shadow hover:scale-105 transition"
+                className="flex items-center justify-center gap-2
+                           bg-purple-500 text-white px-4 py-2 rounded-xl"
               >
-                <Share2 className="w-5 h-5" /> Share
+                <Share2 size={18} /> Share
               </button>
               <button
                 onClick={downloadReport}
-                className="flex items-center gap-2
-                           bg-gradient-to-r from-indigo-500 to-blue-500
-                           text-white px-5 py-2 rounded-xl
-                           font-semibold shadow hover:scale-105 transition"
+                className="flex items-center justify-center gap-2
+                           bg-indigo-500 text-white px-4 py-2 rounded-xl"
               >
-                <Download className="w-5 h-5" /> Download
+                <Download size={18} /> Download
               </button>
             </div>
           </div>
