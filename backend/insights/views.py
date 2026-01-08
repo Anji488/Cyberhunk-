@@ -64,7 +64,7 @@ def safe_request(url: str) -> dict:
 def fetch_profile(token: str) -> dict:
     url = (
         f"https://graph.facebook.com/v19.0/me?"
-        f"fields=id,name,birthday,gender,picture.width(200).height(200)"
+        f"fields=id,name,user_birthday,user_gender,picture.width(200).height(200)"
         f"&access_token={token}"
     )
     return safe_request(url)
@@ -133,7 +133,7 @@ def analyze_facebook(request):
         # 3. Fetch Profile (Verify Token with FB)
         profile_url = (
             f"https://graph.facebook.com/v19.0/me?"
-            f"fields=id,name,birthday,gender,picture.width(200).height(200)"
+            f"fields=id,name,user_birthday,user_gender,picture.width(200).height(200)"
             f"&access_token={token}"
         )
         try:

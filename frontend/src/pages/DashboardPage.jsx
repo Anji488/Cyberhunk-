@@ -61,8 +61,8 @@ export default function DashboardPage() {
             />
             <div>
               <p className="font-semibold text-gray-800">{profile.name}</p>
-              <p className="text-gray-500 text-sm">{profile.gender || "N/A"}</p>
-              <p className="text-gray-500 text-sm">{profile.birthday || "N/A"}</p>
+              <p className="text-gray-500 text-sm">{profile.user_gender || "N/A"}</p>
+              <p className="text-gray-500 text-sm">{profile.user_birthday || "N/A"}</p>
             </div>
           </div>
         </div>

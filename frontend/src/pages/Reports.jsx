@@ -251,10 +251,10 @@ export default function ReportsPage({ token }) {
                         {selectedReport.profile.name}
                       </p>
                       <p className="text-sm text-gray-600">
-                        {selectedReport.profile.birthday || "N/A"}
+                        {selectedReport.profile.user_birthday || "N/A"}
                       </p>
                       <p className="text-sm text-gray-600">
-                        {selectedReport.profile.gender || "N/A"}
+                        {selectedReport.profile.user_gender || "N/A"}
                       </p>
                     </div>
                   </div>
