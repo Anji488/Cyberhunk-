@@ -8,7 +8,7 @@ FACEBOOK_CLIENT_SECRET = settings.FB_APP_SECRET
 BASE_URL = settings.BASE_URL
 FRONTEND_URL = settings.FRONTEND_URL
 
-REDIRECT_URI = f"{BASE_URL}/auth/facebook/callback"
+REDIRECT_URI = f"{BASE_URL}/auth/facebook/callback/"
 
 def facebook_login(request):
     """Redirect user to Facebook OAuth login page."""
@@ -16,7 +16,7 @@ def facebook_login(request):
     params = {
         "client_id": FACEBOOK_CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
-        "scope": "email,public_profile",
+        "scope": "email,public_profile,user_posts",
         "response_type": "code",
     }
     url = f"{fb_auth_url}?{requests.compat.urlencode(params)}"
