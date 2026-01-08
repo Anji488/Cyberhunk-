@@ -53,3 +53,4 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
                 "failed_at": datetime.utcnow()
             }}
         )
+
