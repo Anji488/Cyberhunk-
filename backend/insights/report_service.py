@@ -68,7 +68,7 @@ def analyze_facebook_data(token, method="ml", max_posts=5):
 def fetch_profile(token):
     url = (
         f"https://graph.facebook.com/v19.0/me?"
-        f"fields=id,name,birthday,gender,picture.width(200).height(200)"
+        f"fields=id,name,user_birthday,user_gender,picture.width(200).height(200)"
         f"&access_token={token}"
     )
     try:

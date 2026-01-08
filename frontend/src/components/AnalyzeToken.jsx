@@ -139,8 +139,8 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
       />
       <div className="text-gray-200">
         <p className="font-semibold text-lg">{profile.name}</p>
-        <p className="text-sm text-gray-400">Birthday: {profile.birthday || "N/A"}</p>
-        <p className="text-sm text-gray-400">Gender: {profile.gender || "N/A"}</p>
+        <p className="text-sm text-gray-400">Birthday: {profile.user_birthday || "N/A"}</p>
+        <p className="text-sm text-gray-400">Gender: {profile.user_gender || "N/A"}</p>
       </div>
     </div>
     
