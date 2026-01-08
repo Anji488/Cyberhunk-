@@ -16,7 +16,7 @@ def facebook_login(request):
     params = {
         "client_id": FACEBOOK_CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
-        "scope": "email,public_profile,user_posts,user_birthday,user_gender",
+        "scope": "email,public_profile,user_posts,birthday,user_gender",
         "response_type": "code",
     }
     url = f"{fb_auth_url}?{requests.compat.urlencode(params)}"

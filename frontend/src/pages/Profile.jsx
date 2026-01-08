@@ -246,10 +246,10 @@ export default function ProfilePage() {
               <div>
                 <p className="font-semibold text-gray-800">{profile.name}</p>
                 <p className="text-gray-500 text-sm">
-                  {profile.user_gender || "N/A"}
+                  {profile.gender || "N/A"}
                 </p>
                 <p className="text-gray-500 text-sm">
-                  {profile.user_birthday || "N/A"}
+                  {profile.birthday || "N/A"}
                 </p>
               </div>
             </div>
