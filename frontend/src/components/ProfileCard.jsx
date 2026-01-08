@@ -5,8 +5,8 @@ export default function ProfileCard({ profile }) {
       <img src={profile.picture?.data?.url} alt="Profile" className="rounded-full w-20 h-20" />
       <div>
         <h3 className="text-xl font-semibold">{profile.name}</h3>
-        <p className="text-gray-600">Birthday: {profile.user_birthday || "N/A"}</p>
-        <p className="text-gray-600">Gender: {profile.user_gender || "N/A"}</p>
+        <p className="text-gray-600">Birthday: {profile.birthday || "N/A"}</p>
+        <p className="text-gray-600">Gender: {profile.gender || "N/A"}</p>
       </div>
     </div>
   );

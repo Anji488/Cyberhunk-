@@ -46,7 +46,7 @@ export default function Dashboard() {
 
     const fetchData = async () => {
       try {
-        const profileRes = await axios.get(`https://graph.facebook.com/me?fields=id,name,user_birthday,user_gender,picture.width(150).height(150)&access_token=${token}`);
+        const profileRes = await axios.get(`https://graph.facebook.com/me?fields=id,name,birthday,gender,picture.width(150).height(150)&access_token=${token}`);
         setProfile(profileRes.data);
         localStorage.setItem("fb_profile", JSON.stringify(profileRes.data));
       } catch (err) {
@@ -157,8 +157,8 @@ console.log("Insight metrics:", insightMetrics);
           <img src={profile.picture?.data?.url} alt="Profile" className="rounded-full w-20 h-20" />
           <div>
             <h3 className="text-xl font-semibold">{profile.name}</h3>
-            <p className="text-gray-600">Birthday: {profile.user_birthday || "N/A"}</p>
-            <p className="text-gray-600">Gender: {profile.user_gender || "N/A"}</p>
+            <p className="text-gray-600">Birthday: {profile.birthday || "N/A"}</p>
+            <p className="text-gray-600">Gender: {profile.gender || "N/A"}</p>
           </div>
         </div>
       )}

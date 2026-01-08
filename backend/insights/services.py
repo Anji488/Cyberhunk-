@@ -342,7 +342,7 @@ def compute_insight_metrics(insights: list):
 def fetch_profile(token):
     url = (
         f"https://graph.facebook.com/v19.0/me?"
-        f"fields=id,name,user_birthday,user_gender,picture.width(200).height(200)"
+        f"fields=id,name,birthday,gender,picture.width(200).height(200)"
         f"&access_token={token}"
     )
     res = requests.get(url, timeout=10)
