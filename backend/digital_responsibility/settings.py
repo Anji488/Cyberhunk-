@@ -172,7 +172,3 @@ CSRF_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
 
 APPEND_SLASH = False
-
-CSRF_USE_SESSIONS = False
-CSRF_COOKIE_HTTPONLY = False
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
