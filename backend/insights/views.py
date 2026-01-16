@@ -27,9 +27,9 @@ from insights.services import (
 
 MAX_THREADS = 5
 REQUEST_DELAY = 0.3
-DEFAULT_MAX_POSTS = 20
+DEFAULT_MAX_POSTS = 5
 MAX_COMMENTS = 5
-MAX_POSTS_LIMIT = 20
+MAX_POSTS_LIMIT = 5
 MAX_COMMENTS_LIMIT = 5
 MAX_NESTED = 5
 
@@ -71,7 +71,7 @@ def fetch_profile(token: str) -> dict:
 
 def fetch_comments(post_id: str, token: str) -> list:
     comments = []
-    next_url = f"https://graph.facebook.com/v19.0/{post_id}/comments?fields=message,created_time,comments&limit=20&access_token={token}"
+    next_url = f"https://graph.facebook.com/v19.0/{post_id}/comments?fields=message,created_time,comments&limit=5&access_token={token}"
     while next_url and len(comments) < MAX_COMMENTS:
         data = safe_request(next_url)
         comments.extend(data.get("data", []))
@@ -128,7 +128,7 @@ def analyze_facebook(request):
             return cors_json_response({"error": "Authorization token missing"}, status=401)
 
         method = request.GET.get("method", "ml")
-        max_posts = min(int(request.GET.get("max_posts", 20)), MAX_POSTS_LIMIT)
+        max_posts = min(int(request.GET.get("max_posts", 10)), MAX_POSTS_LIMIT)
 
         # 3. Fetch Profile (Verify Token with FB)
         profile_url = (
@@ -267,7 +267,7 @@ def request_report(request):
 
     token = data.get("token")
     method = data.get("method", "ml")
-    max_posts = int(data.get("max_posts", 20))
+    max_posts = int(data.get("max_posts", 5))
 
     if not token:
         return JsonResponse({"error": "Token required"}, status=400)
