@@ -7,6 +7,8 @@ import json
 import requests
 
 import pytz
+import numpy as np
+
 from langdetect import detect, LangDetectException
 from emoji import demojize, EMOJI_DATA
 
@@ -21,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
 
-# =========================
-# 🧹 TEXT NORMALIZATION
-# =========================
+
+# TEXT NORMALIZATION
+
 def remove_variation_selectors(text: str) -> str:
     """Remove emoji variation selectors (U+FE0F)."""
     return text.replace("\ufe0f", "")
@@ -36,9 +38,9 @@ def is_emoji_only(text: str) -> bool:
     )
 
 
-# =========================
-# 📌 CORE NLP ANALYSIS
-# =========================
+
+# CORE NLP ANALYSIS
+
 def analyze_text(text: str, method="ml") -> dict:
     """
     Safe sentiment analysis with:
@@ -57,9 +59,9 @@ def analyze_text(text: str, method="ml") -> dict:
     original_text = text.strip()
     clean_text = remove_variation_selectors(original_text)
 
-    # -------------------------
+    
     # Emoji-only handling
-    # -------------------------
+    
     if is_emoji_only(clean_text):
         positive_emojis = {"😍", "🥰", "❤️", "😂", "😊", "👍"}
         negative_emojis = {"😢", "💔", "😠", "😡", "😞"}
@@ -77,15 +79,15 @@ def analyze_text(text: str, method="ml") -> dict:
             "label": label,
         }
 
-    # -------------------------
-    # Emoji → text
-    # -------------------------
+    
+    # Emoji to text
+    
     processed_text = demojize(clean_text)
     processed_text = processed_text.replace(":", " ").replace("_", " ")
 
-    # -------------------------
+    
     # Language detection
-    # -------------------------
+    
     try:
         lang = detect(processed_text)
     except LangDetectException:
@@ -93,12 +95,12 @@ def analyze_text(text: str, method="ml") -> dict:
 
     translated_text = processed_text
 
-    # -------------------------
-    # Lazy translation (safe)
-    # -------------------------
+    
+    # Lazy translation 
+    
     if lang != "en":
         try:
-            from googletrans import Translator  # lazy import
+            from googletrans import Translator 
             translator = Translator()
             translated_text = translator.translate(
                 processed_text, dest="en"
@@ -107,16 +109,15 @@ def analyze_text(text: str, method="ml") -> dict:
             logger.warning(f"[TRANSLATION FAILED] {e}")
             translated_text = processed_text
 
-    # -------------------------
-    # Sentiment ML (Updated for API)
-    # -------------------------
+    
+    # Sentiment ML
+    
     label = "neutral"
 
     if method == "ml":
         sentiment_predictor = insight_models.get_sentiment_model()
         if sentiment_predictor:
             try:
-                # The predictor now calls query_hf_api
                 pred = sentiment_predictor(translated_text)
                 
                 # API returns [[{'label': '...', 'score': ...}]]
@@ -138,9 +139,9 @@ def analyze_text(text: str, method="ml") -> dict:
     }
 
 
-# =========================
-# 📍 LOCATION DETECTION
-# =========================
+
+# LOCATION DETECTION
+
 def mentions_location(text: str):
     if not text:
         return None
@@ -167,9 +168,9 @@ def mentions_location(text: str):
     return None
 
 
-# =========================
-# ☣️ TOXICITY (Updated for API)
-# =========================
+
+# TOXICITY
+
 def is_toxic(text: str) -> bool:
     if not text:
         return False
@@ -188,7 +189,6 @@ def is_toxic(text: str) -> bool:
         try:
             pred = toxic_predictor(text)
             if pred and isinstance(pred, list):
-                # API response handling
                 data = pred[0][0] if isinstance(pred[0], list) else pred[0]
                 label = str(data.get("label", "")).lower()
                 # Check for 'toxic' label or high scores in specific labels
@@ -203,9 +203,9 @@ def is_respectful(text: str) -> bool:
     return not is_toxic(text)
 
 
-# =========================
-# 🔐 PRIVACY
-# =========================
+
+# PRIVACY
+
 def discloses_personal_info(text: str) -> bool:
     if not text:
         return False
@@ -220,9 +220,9 @@ def discloses_personal_info(text: str) -> bool:
         return False
 
 
-# =========================
-# 🧠 MISINFORMATION (Updated for API)
-# =========================
+
+# MISINFORMATION
+
 def is_potential_misinformation(text: str) -> bool:
     if not text or not text.strip():
         return False
@@ -297,18 +297,18 @@ Rules:
     return recommendations[:4]
 
 def compute_insight_metrics(insights: list):
-    total = max(len(insights), 1)
-
-    sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
-    night_posts = 0
-    location_mentions = 0
-    respectful_count = 0
+    # Prepare lists for statistical calculations
+    positive_list = []
+    night_post_list = []
+    location_list = []
+    respectful_list = []
 
     for item in insights:
+        # Positive posts
         label = (item.get("label") or "").lower()
-        if label in sentiment_counts:
-            sentiment_counts[label] += 1
+        positive_list.append(1 if label == "positive" else 0)
 
+        # Night posts
         ts = item.get("timestamp")
         if ts:
             try:
@@ -316,25 +316,44 @@ def compute_insight_metrics(insights: list):
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=pytz.UTC)
                 local_dt = dt.astimezone(LOCAL_TZ)
-                if local_dt.hour >= 23 or local_dt.hour < 6:
-                    night_posts += 1
+                night_post_list.append(1 if local_dt.hour >= 23 or local_dt.hour < 6 else 0)
             except Exception:
-                pass
+                night_post_list.append(0)
+        else:
+            night_post_list.append(0)
 
-        if item.get("mentions_location"):
-            location_mentions += 1
+        # Location mentions
+        location_list.append(1 if item.get("mentions_location") else 0)
 
-        if item.get("is_respectful"):
-            respectful_count += 1
+        # Respectfulness
+        respectful_list.append(1 if item.get("is_respectful") else 0)
+
+    # Helper function to calculate percentile-based percentage
+    def percentile_metric(values, invert=False):
+        if not values:
+            return 0
+        arr = np.array(values)
+        # Use 90th percentile to avoid influence of extreme outliers
+        perc = np.percentile(arr, 90)
+        min_val = np.min(arr)
+        max_val = np.max(arr)
+        # Avoid division by zero
+        if max_val == min_val:
+            score = perc
+        else:
+            score = (perc - min_val) / (max_val - min_val)
+        if invert:
+            score = 1 - score
+        return round(score * 100)
 
     insightMetrics = [
-        {"title": "Happy Posts", "value": round((sentiment_counts["positive"] / total) * 100)},
-        {"title": "Good Posting Habits", "value": round(100 - (night_posts / total) * 100)},
-        {"title": "Privacy Care", "value": round(100 - (location_mentions / total) * 100)},
-        {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
+        {"title": "Happy Posts", "value": percentile_metric(positive_list)},
+        {"title": "Good Posting Habits", "value": percentile_metric(night_post_list, invert=True)},
+        {"title": "Privacy Care", "value": percentile_metric(location_list, invert=True)},
+        {"title": "Being Respectful", "value": percentile_metric(respectful_list)},
     ]
 
-    # ✅ AI-GENERATED RECOMMENDATIONS
+    # AI-GENERATED RECOMMENDATIONS
     recommendations = generate_ai_recommendations_openai(insights, insightMetrics)
 
     return insightMetrics, recommendations
