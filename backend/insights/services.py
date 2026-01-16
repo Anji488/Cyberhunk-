@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
 
+
 # TEXT NORMALIZATION
 
 def remove_variation_selectors(text: str) -> str:
@@ -58,44 +59,24 @@ def analyze_text(text: str, method="ml") -> dict:
 
     
     # Emoji-only handling
-    def emoji_sentiment_analysis(text: str) -> str:
-        """
-        Analyze any emoji or text+emoji sentiment using OpenAI.
-        Returns: 'positive', 'neutral', or 'negative'
-        """
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-        if not text or not text.strip():
-            return "neutral"
-
-        prompt = f"""
-    Analyze the sentiment of the following text or emoji. 
-    Return only one word: positive, neutral, or negative.
-
-    Text/Emoji: {text}
-    """
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",   
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0
-            )
-            label = response.choices[0].message.content.strip().lower()
-            if label not in {"positive", "neutral", "negative"}:
-                return "neutral"
-            return label
-        except Exception as e:
-            logger.error(f"[OPENAI EMOJI ERROR] {e}")
-            return "neutral"
-
+    
     if is_emoji_only(clean_text):
-        # Use OpenAI to detect sentiment of any emoji
-        label = emoji_sentiment_analysis(clean_text)
+        positive_emojis = {"😍", "🥰", "❤️", "😂", "😊", "👍"}
+        negative_emojis = {"😢", "💔", "😠", "😡", "😞"}
+
+        if any(e in clean_text for e in positive_emojis):
+            label = "positive"
+        elif any(e in clean_text for e in negative_emojis):
+            label = "negative"
+        else:
+            label = "neutral"
+
         return {
             "original": original_text,
             "translated": original_text,
             "label": label,
         }
+
     
     # Emoji to text
     
@@ -313,65 +294,18 @@ Rules:
 
     return recommendations[:4]
 
-def percentile(values, percent):
-    """Return the percentile value from a list (0-1 scale)."""
-    if not values:
-        return 0
-    values = sorted(values)
-    k = (len(values)-1) * percent / 100
-    f = int(k)
-    c = min(f+1, len(values)-1)
-    d0 = values[f] * (c-k)
-    d1 = values[c] * (k-f)
-    return d0 + d1
-
-def percentile(values, percent):
-    """Return the percentile value from a sorted list."""
-    if not values:
-        return 0
-    values = sorted(values)
-    k = (len(values) - 1) * percent / 100
-    f = int(k)
-    c = min(f + 1, len(values) - 1)
-    d0 = values[f] * (c - k)
-    d1 = values[c] * (k - f)
-    return d0 + d1
-
-
-def percentile_metric(values, invert=False):
-    """Compute percentile-based metric with min-max scaling, safely."""
-    if not values:
-        return 0
-
-    # Convert boolean/binary values to float
-    values_float = [float(v) for v in values]
-
-    # 90th percentile
-    p90 = percentile(values_float, 90)
-    min_val = min(values_float)
-    max_val = max(values_float)
-
-    # Avoid divide by zero
-    if max_val != min_val:
-        score = (p90 - min_val) / (max_val - min_val)
-    else:
-        score = p90
-
-    if invert:
-        score = 1 - score
-
-    return round(score * 100)
-
-
 def compute_insight_metrics(insights: list):
-    positive_list = []
-    night_list = []
-    location_list = []
-    respectful_list = []
+    total = max(len(insights), 1)
+
+    sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
+    night_posts = 0
+    location_mentions = 0
+    respectful_count = 0
 
     for item in insights:
         label = (item.get("label") or "").lower()
-        positive_list.append(1 if label == "positive" else 0)
+        if label in sentiment_counts:
+            sentiment_counts[label] += 1
 
         ts = item.get("timestamp")
         if ts:
@@ -380,32 +314,28 @@ def compute_insight_metrics(insights: list):
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=pytz.UTC)
                 local_dt = dt.astimezone(LOCAL_TZ)
-                night_list.append(1 if local_dt.hour >= 23 or local_dt.hour < 6 else 0)
+                if local_dt.hour >= 23 or local_dt.hour < 6:
+                    night_posts += 1
             except Exception:
-                night_list.append(0)
-        else:
-            night_list.append(0)
+                pass
 
-        location_list.append(1 if item.get("mentions_location") else 0)
-        respectful_list.append(1 if item.get("is_respectful") else 0)
+        if item.get("mentions_location"):
+            location_mentions += 1
+
+        if item.get("is_respectful"):
+            respectful_count += 1
 
     insightMetrics = [
-        {"title": "Happy Posts", "value": percentile_metric(positive_list)},
-        {"title": "Good Posting Habits", "value": percentile_metric(night_list, invert=True)},
-        {"title": "Privacy Care", "value": percentile_metric(location_list, invert=True)},
-        {"title": "Being Respectful", "value": percentile_metric(respectful_list)},
+        {"title": "Happy Posts", "value": round((sentiment_counts["positive"] / total) * 100)},
+        {"title": "Good Posting Habits", "value": round(100 - (night_posts / total) * 100)},
+        {"title": "Privacy Care", "value": round(100 - (location_mentions / total) * 100)},
+        {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
     ]
 
-    # Generate recommendations safely
-    try:
-        recommendations = generate_ai_recommendations_openai(insights, insightMetrics)
-    except Exception as e:
-        logger.error(f"[RECOMMENDATION FAILED] {e}")
-        recommendations = []
+    # AI-GENERATED RECOMMENDATIONS
+    recommendations = generate_ai_recommendations_openai(insights, insightMetrics)
 
     return insightMetrics, recommendations
-
-
 
 def fetch_profile(token):
     url = (
