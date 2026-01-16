@@ -3,6 +3,8 @@ import axios from "axios";
 import AnalyzeToken from "../components/AnalyzeToken";
 import * as htmlToImage from "html-to-image";
 import download from "downloadjs";
+import { motion } from "framer-motion";
+import InsightCard from "@/components/InsightCard";
 
 const BACKEND_URL = "https://cyberhunk.onrender.com";
 
@@ -11,8 +13,6 @@ export default function ReportsPage({ token }) {
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-
   const [sortOrder, setSortOrder] = useState("newest");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
@@ -21,21 +21,12 @@ export default function ReportsPage({ token }) {
 
   useEffect(() => {
     if (!profile?.id) return;
-
-    const fetchReports = async () => {
-      setLoading(true);
-      try {
-        const res = await axios.get(`${BACKEND_URL}/insights/reports/`, {
-          params: { profile_id: String(profile.id) },
-          withCredentials: true,
-        });
-        setReports(res.data?.reports || []);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchReports();
+    axios
+      .get(`${BACKEND_URL}/insights/reports/`, {
+        params: { profile_id: String(profile.id) },
+        withCredentials: true,
+      })
+      .then((res) => setReports(res.data?.reports || []));
   }, [profile?.id]);
 
   const processedReports = useMemo(() => {
@@ -68,8 +59,20 @@ export default function ReportsPage({ token }) {
     download(dataUrl, `report_${selectedReport.report_id}.png`);
   };
 
-  const closeModal = (e) => {
-    if (e.target.id === "modal") setIsModalOpen(false);
+  const shareReport = async () => {
+    const dataUrl = await htmlToImage.toPng(reportRef.current);
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], "report.png", { type: blob.type });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({
+        title: "Digital Behavior Report",
+        files: [file],
+      });
+    }
+  };
+
+  const closeOnBackdrop = (e) => {
+    if (e.target.id === "modal-backdrop") setIsModalOpen(false);
   };
 
   return (
@@ -121,10 +124,10 @@ export default function ReportsPage({ token }) {
               <tr>
                 <th className="px-4 py-3 text-left">No</th>
                 <th className="px-4 py-3 text-left">Test Taken</th>
-                <th className="px-4 py-3">Happy Posts</th>
-                <th className="px-4 py-3">Good Posting Habits</th>
-                <th className="px-4 py-3">Privacy Care</th>
-                <th className="px-4 py-3">Being Respectful</th>
+                <th className="px-4 py-3 text-center">Happy Posts</th>
+                <th className="px-4 py-3 text-center">Good Posting Habits</th>
+                <th className="px-4 py-3 text-center">Privacy Care</th>
+                <th className="px-4 py-3 text-center">Being Respectful</th>
                 <th className="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
@@ -132,7 +135,7 @@ export default function ReportsPage({ token }) {
             <tbody>
               {paginatedReports.map((r, i) => {
                 const metrics = Object.fromEntries(
-                  (r.insightMetrics || []).map(m => [m.title, m.value])
+                  (r.insightMetrics || []).map((m) => [m.title, m.value])
                 );
 
                 return (
@@ -147,16 +150,24 @@ export default function ReportsPage({ token }) {
                         year: "numeric",
                       })}
                     </td>
-                    <td className="px-4 py-3 text-center">{metrics["Happy Posts"] ?? "—"}%</td>
-                    <td className="px-4 py-3 text-center">{metrics["Good Posting Habits"] ?? "—"}%</td>
-                    <td className="px-4 py-3 text-center">{metrics["Privacy Care"] ?? "—"}%</td>
-                    <td className="px-4 py-3 text-center">{metrics["Being Respectful"] ?? "—"}%</td>
+                    <td className="px-4 py-3 text-center">
+                      {metrics["Happy Posts"] ?? "—"}%
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {metrics["Good Posting Habits"] ?? "—"}%
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {metrics["Privacy Care"] ?? "—"}%
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {metrics["Being Respectful"] ?? "—"}%
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => fetchReport(r.report_id)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs"
                       >
-                        View More
+                        View
                       </button>
                     </td>
                   </tr>
@@ -170,7 +181,7 @@ export default function ReportsPage({ token }) {
           <div className="mt-6 flex justify-center gap-2">
             <button
               disabled={currentPage === 1}
-              onClick={() => setCurrentPage(p => p - 1)}
+              onClick={() => setCurrentPage((p) => p - 1)}
               className="px-4 py-2 border rounded disabled:opacity-40"
             >
               Prev
@@ -192,7 +203,7 @@ export default function ReportsPage({ token }) {
 
             <button
               disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(p => p + 1)}
+              onClick={() => setCurrentPage((p) => p + 1)}
               className="px-4 py-2 border rounded disabled:opacity-40"
             >
               Next
@@ -202,33 +213,90 @@ export default function ReportsPage({ token }) {
 
         {isModalOpen && selectedReport && (
           <div
-            id="modal"
-            onClick={closeModal}
+            id="modal-backdrop"
+            onClick={closeOnBackdrop}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
-            <div className="bg-white w-full max-w-3xl rounded-3xl p-6 relative">
+            <div className="bg-white w-full max-w-5xl rounded-3xl shadow-xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto relative">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="absolute top-4 right-4 text-xl"
+                className="absolute top-4 right-4 text-xl text-gray-500"
               >
                 ×
               </button>
 
-              <div ref={reportRef} className="space-y-6 p-6 bg-indigo-50 rounded-2xl">
-                <h3 className="text-xl font-bold text-indigo-700">
-                  Detailed Report
-                </h3>
+              <div
+                ref={reportRef}
+                className="space-y-8 p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl"
+              >
+                {selectedReport.profile && (
+                  <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-2xl shadow">
+                    <img
+                      src={selectedReport.profile.picture?.data?.url}
+                      className="w-20 h-20 rounded-full border-4 border-indigo-300"
+                    />
+                    <div>
+                      <p className="font-bold text-xl">
+                        {selectedReport.profile.name}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {selectedReport.profile.gender || "N/A"}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {selectedReport.profile.birthday || "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {selectedReport.insightMetrics.map((m, i) => (
-                    <li key={i} className="bg-white p-4 rounded-xl shadow">
-                      {m.title} — {m.value}%
-                    </li>
-                  ))}
-                </ul>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <h3 className="text-2xl font-bold text-indigo-600 mb-4">
+                    Insight Metrics
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {selectedReport.insightMetrics.map((metric, idx) => (
+                      <InsightCard
+                        key={idx}
+                        title={metric.title}
+                        value={`${metric.value}%`}
+                        rating={metric.rating}
+                        className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-5"
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+
+                {selectedReport.recommendations?.length > 0 && (
+                  <div>
+                    <h3 className="text-2xl font-bold text-purple-600 mb-4">
+                      Recommendations
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {selectedReport.recommendations.map((r, i) => (
+                        <div
+                          key={i}
+                          className="bg-white rounded-2xl p-4 shadow"
+                        >
+                          {r.text || r}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={shareReport}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl"
+                >
+                  Share
+                </button>
                 <button
                   onClick={downloadReport}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl"
