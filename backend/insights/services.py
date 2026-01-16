@@ -294,18 +294,28 @@ Rules:
 
     return recommendations[:4]
 
-def compute_insight_metrics(insights: list):
-    total = max(len(insights), 1)
+def percentile(values, percent):
+    """Return the percentile value from a list (0-1 scale)."""
+    if not values:
+        return 0
+    values = sorted(values)
+    k = (len(values)-1) * percent / 100
+    f = int(k)
+    c = min(f+1, len(values)-1)
+    d0 = values[f] * (c-k)
+    d1 = values[c] * (k-f)
+    return d0 + d1
 
-    sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
-    night_posts = 0
-    location_mentions = 0
-    respectful_count = 0
+def compute_insight_metrics(insights: list):
+    # Prepare lists for percentile computation
+    positive_list = []
+    night_list = []
+    location_list = []
+    respectful_list = []
 
     for item in insights:
         label = (item.get("label") or "").lower()
-        if label in sentiment_counts:
-            sentiment_counts[label] += 1
+        positive_list.append(1 if label == "positive" else 0)
 
         ts = item.get("timestamp")
         if ts:
@@ -314,28 +324,40 @@ def compute_insight_metrics(insights: list):
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=pytz.UTC)
                 local_dt = dt.astimezone(LOCAL_TZ)
-                if local_dt.hour >= 23 or local_dt.hour < 6:
-                    night_posts += 1
+                night_list.append(1 if local_dt.hour >= 23 or local_dt.hour < 6 else 0)
             except Exception:
-                pass
+                night_list.append(0)
+        else:
+            night_list.append(0)
 
-        if item.get("mentions_location"):
-            location_mentions += 1
+        location_list.append(1 if item.get("mentions_location") else 0)
+        respectful_list.append(1 if item.get("is_respectful") else 0)
 
-        if item.get("is_respectful"):
-            respectful_count += 1
+    def percentile_metric(values, invert=False):
+        p90 = percentile(values, 90)
+        min_val = min(values) if values else 0
+        max_val = max(values) if values else 1
+        score = (p90 - min_val) / (max_val - min_val) if max_val != min_val else p90
+        if invert:
+            score = 1 - score
+        return round(score * 100)
 
     insightMetrics = [
-        {"title": "Happy Posts", "value": round((sentiment_counts["positive"] / total) * 100)},
-        {"title": "Good Posting Habits", "value": round(100 - (night_posts / total) * 100)},
-        {"title": "Privacy Care", "value": round(100 - (location_mentions / total) * 100)},
-        {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
+        {"title": "Happy Posts", "value": percentile_metric(positive_list)},
+        {"title": "Good Posting Habits", "value": percentile_metric(night_list, invert=True)},
+        {"title": "Privacy Care", "value": percentile_metric(location_list, invert=True)},
+        {"title": "Being Respectful", "value": percentile_metric(respectful_list)},
     ]
 
-    # AI-GENERATED RECOMMENDATIONS
-    recommendations = generate_ai_recommendations_openai(insights, insightMetrics)
+    # Generate recommendations safely
+    try:
+        recommendations = generate_ai_recommendations_openai(insights, insightMetrics)
+    except Exception as e:
+        logger.error(f"[RECOMMENDATION FAILED] {e}")
+        recommendations = []
 
     return insightMetrics, recommendations
+
 
 def fetch_profile(token):
     url = (
