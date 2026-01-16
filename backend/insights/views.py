@@ -44,9 +44,9 @@ def robots_txt(request):
 
 logger = logging.getLogger(__name__)
 
-# -----------------------------
+
 # Helper functions
-# -----------------------------
+
 def safe_request(url: str) -> dict:
     time.sleep(REQUEST_DELAY)
     try:
@@ -100,9 +100,9 @@ def cors_json_response(data, status=200):
     response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response
 
-# -----------------------------
+
 # Main View
-# -----------------------------
+
 @csrf_exempt
 def analyze_facebook(request):
     # 1. Handle Preflight OPTIONS request (Required for CORS)
