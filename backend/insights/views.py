@@ -27,7 +27,7 @@ from insights.services import (
 
 MAX_THREADS = 5
 REQUEST_DELAY = 0.3
-DEFAULT_MAX_POSTS = 5
+DEFAULT_MAX_POSTS = 20
 MAX_COMMENTS = 5
 MAX_POSTS_LIMIT = 20
 MAX_COMMENTS_LIMIT = 5
@@ -128,7 +128,7 @@ def analyze_facebook(request):
             return cors_json_response({"error": "Authorization token missing"}, status=401)
 
         method = request.GET.get("method", "ml")
-        max_posts = min(int(request.GET.get("max_posts", 10)), MAX_POSTS_LIMIT)
+        max_posts = min(int(request.GET.get("max_posts", 20)), MAX_POSTS_LIMIT)
 
         # 3. Fetch Profile (Verify Token with FB)
         profile_url = (

@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True)
-def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=None):
+def generate_report(self, report_id, token, method="ml", max_posts=20, user_id=None):
 
     logger.info(f"📝 Creating report | report_id={report_id}")
 
