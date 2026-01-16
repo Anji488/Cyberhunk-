@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 REQUEST_DELAY = 0.3
 
 
-def analyze_facebook_data(token, method="ml", max_posts=20):
+def analyze_facebook_data(token, method="ml", max_posts=5):
     insights = []
     fetched_posts = 0
 
