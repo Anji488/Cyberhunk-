@@ -23,7 +23,7 @@ try:
     logger.info("✅ MongoDB CONNECTED")
 
 except Exception as e:
-    logger.error(f"❌ MongoDB CONNECTION FAILED: {e}")
+    logger.error(f"MongoDB CONNECTION FAILED: {e}")
     raise  # VERY IMPORTANT
 
 db = client[database]
