@@ -29,7 +29,7 @@ MAX_THREADS = 5
 REQUEST_DELAY = 0.3
 DEFAULT_MAX_POSTS = 5
 MAX_COMMENTS = 5
-MAX_POSTS_LIMIT = 5
+MAX_POSTS_LIMIT = 20
 MAX_COMMENTS_LIMIT = 5
 MAX_NESTED = 5
 
@@ -267,7 +267,7 @@ def request_report(request):
 
     token = data.get("token")
     method = data.get("method", "ml")
-    max_posts = int(data.get("max_posts", 5))
+    max_posts = int(data.get("max_posts", 20))
 
     if not token:
         return JsonResponse({"error": "Token required"}, status=400)
