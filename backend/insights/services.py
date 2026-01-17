@@ -18,7 +18,7 @@ from insights.hf_models import map_sentiment_label
 print(os.getenv("HUGGINGFACE_TOKEN"))
 
 logger = logging.getLogger(__name__)
-f
+
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
 
 # =========================
