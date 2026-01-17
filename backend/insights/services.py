@@ -22,58 +22,97 @@ logger = logging.getLogger(__name__)
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
 
 def remove_variation_selectors(text: str) -> str:
+    """Remove emoji variation selectors (U+FE0F)."""
     return text.replace("\ufe0f", "")
 
 
 def is_emoji_only(text: str) -> bool:
     stripped = text.strip()
-    return bool(stripped) and all(ch in EMOJI_DATA or ch.isspace() for ch in stripped)
+    return bool(stripped) and all(
+        ch in EMOJI_DATA or ch.isspace() for ch in stripped
+    )
 
 
 def analyze_text(text: str, method="ml") -> dict:
+    """
+    Safe sentiment analysis with:
+    - emoji handling
+    - lazy translation
+    - fail-safe ML execution
+    """
+
     if not text or not text.strip():
-        return {"original": text, "translated": text, "label": "neutral"}
+        return {
+            "original": text,
+            "translated": text,
+            "label": "neutral",
+        }
 
     original_text = text.strip()
     clean_text = remove_variation_selectors(original_text)
 
-    # 1. Emoji Shortcut
     if is_emoji_only(clean_text):
-        pos = {"😍", "🥰", "❤️", "😂", "😊", "👍"}
-        neg = {"😢", "💔", "😠", "😡", "😞"}
-        label = "positive" if any(e in clean_text for e in pos) else \
-                "negative" if any(e in clean_text for e in neg) else "neutral"
-        return {"original": original_text, "translated": original_text, "label": label}
+        positive_emojis = {"😍", "🥰", "❤️", "😂", "😊", "👍"}
+        negative_emojis = {"😢", "💔", "😠", "😡", "😞"}
 
-    # 2. Translation logic
-    processed_text = demojize(clean_text).replace(":", " ").replace("_", " ")
+        if any(e in clean_text for e in positive_emojis):
+            label = "positive"
+        elif any(e in clean_text for e in negative_emojis):
+            label = "negative"
+        else:
+            label = "neutral"
+
+        return {
+            "original": original_text,
+            "translated": original_text,
+            "label": label,
+        }
+
+    processed_text = demojize(clean_text)
+    processed_text = processed_text.replace(":", " ").replace("_", " ")
+
     try:
         lang = detect(processed_text)
-    except:
+    except LangDetectException:
         lang = "en"
 
     translated_text = processed_text
+
     if lang != "en":
         try:
-            from googletrans import Translator
-            translated_text = Translator().translate(processed_text, dest="en").text
+            from googletrans import Translator  
+            translator = Translator()
+            translated_text = translator.translate(
+                processed_text, dest="en"
+            ).text
         except Exception as e:
-            logger.warning(f"Translation failed: {e}")
+            logger.warning(f"[TRANSLATION FAILED] {e}")
+            translated_text = processed_text
 
-    # 3. ML Sentiment Analysis
     label = "neutral"
-    if method == "ml":
-        predictor = insight_models.get_sentiment_model()
-        pred = predictor(translated_text)
-        
-        if pred and isinstance(pred, list):
-            # Flatten nested list if necessary
-            results = pred[0] if isinstance(pred[0], list) else pred
-            # Find the label with the highest score
-            best_pick = max(results, key=lambda x: x.get("score", 0))
-            label = map_sentiment_label(best_pick.get("label", ""))
 
-    return {"original": original_text, "translated": translated_text, "label": label}
+    if method == "ml":
+        sentiment_predictor = insight_models.get_sentiment_model()
+        if sentiment_predictor:
+            try:
+                pred = sentiment_predictor(translated_text)
+                
+                if pred and isinstance(pred, list):
+                    data = pred[0][0] if isinstance(pred[0], list) else pred[0]
+                    raw_label = data.get("label", "")
+                    score = float(data.get("score", 0))
+                    mapped = map_sentiment_label(raw_label)
+
+                    label = mapped if score >= 0.5 else mapped
+            except Exception as e:
+                logger.error(f"[SENTIMENT ERROR] {e}")
+
+    return {
+        "original": original_text,
+        "translated": translated_text,
+        "label": label,
+    }
+
 
 def mentions_location(text: str):
     if not text:
@@ -102,21 +141,33 @@ def mentions_location(text: str):
 
 
 def is_toxic(text: str) -> bool:
-    if not text: return False
-    
-    # Keyword fallback
-    if any(word in text.lower() for word in ["shit", "fuck", "bitch", "asshole"]):
-        return True
+    if not text:
+        return False
 
-    predictor = insight_models.get_toxic_model()
-    pred = predictor(text)
-    if pred and isinstance(pred, list):
-        results = pred[0] if isinstance(pred[0], list) else pred
-        best_pick = max(results, key=lambda x: x.get("score", 0))
-        lbl = str(best_pick.get("label", "")).lower()
-        # "toxic" or "LABEL_1" usually indicates toxicity in these models
-        return lbl in ["toxic", "label_1"] and best_pick.get("score", 0) > 0.5
-    return False
+    toxic_keywords = {
+        "shit", "fuck", "bitch", "asshole", "bastard"
+    }
+
+    lowered = text.lower()
+    keyword_match = any(word in lowered for word in toxic_keywords)
+
+    toxic_predictor = insight_models.get_toxic_model()
+    model_prediction = False
+
+    if toxic_predictor:
+        try:
+            pred = toxic_predictor(text)
+            if pred and isinstance(pred, list):
+                # API response handling
+                data = pred[0][0] if isinstance(pred[0], list) else pred[0]
+                label = str(data.get("label", "")).lower()
+                # Check for 'toxic' label or high scores in specific labels
+                model_prediction = "toxic" in label or label == "label_1"
+        except Exception as e:
+            logger.error(f"[TOXIC MODEL ERROR] {e}")
+
+    return keyword_match or model_prediction
+
 
 def is_respectful(text: str) -> bool:
     return not is_toxic(text)
@@ -137,15 +188,24 @@ def discloses_personal_info(text: str) -> bool:
 
 
 def is_potential_misinformation(text: str) -> bool:
-    if not text: return False
-    predictor = insight_models.get_misinfo_model()
-    pred = predictor(text)
-    if pred and isinstance(pred, list):
-        results = pred[0] if isinstance(pred[0], list) else pred
-        best_pick = max(results, key=lambda x: x.get("score", 0))
-        lbl = str(best_pick.get("label", "")).lower()
-        return lbl in ["misinfo", "label_1", "yes"] and best_pick.get("score", 0) > 0.5
+    if not text or not text.strip():
+        return False
+
+    misinfo_predictor = insight_models.get_misinfo_model()
+    if not misinfo_predictor:
+        return False
+
+    try:
+        pred = misinfo_predictor(text)
+        if pred and isinstance(pred, list):
+            data = pred[0][0] if isinstance(pred[0], list) else pred[0]
+            label = str(data.get("label", "")).lower()
+            return label in {"misinfo", "misinformation", "true", "yes", "1", "label_1"}
+    except Exception as e:
+        logger.error(f"[MISINFO ERROR] {e}")
+
     return False
+
 
 def generate_ai_recommendations_openai(insights, insightMetrics):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
