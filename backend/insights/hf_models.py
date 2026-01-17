@@ -19,7 +19,7 @@ def query_hf_api(text, model_id):
         return None
 
     # New Router URL for Hugging Face Inference Providers
-    api_url = f"https://api-inference.huggingface.co/models/{model_id}"
+    api_url = f"https://router.huggingface.co/models/{model_id}"
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     
     try:
