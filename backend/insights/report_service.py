@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 REQUEST_DELAY = 0.3
 
 
-def analyze_facebook_data(token, method="ml", max_posts=5):
+def analyze_facebook_data(token, method="ml", max_posts=20):
     insights = []
     fetched_posts = 0
 
     fb_posts_url = (
         f"https://graph.facebook.com/v19.0/me/posts?"
         f"fields=message,story,status_type,created_time,object_id"
-        f"&limit=5&access_token={token}"
+        f"&limit=20&access_token={token}"
     )
 
     while fb_posts_url and fetched_posts < max_posts:
