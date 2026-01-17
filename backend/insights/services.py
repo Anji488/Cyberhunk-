@@ -7,7 +7,7 @@ import json
 import requests
 
 import pytz
-from langdetect import detect, f
+from langdetect import detect, LangDetectException
 from emoji import demojize, EMOJI_DATA
 
 from openai import OpenAI
