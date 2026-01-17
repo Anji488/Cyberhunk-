@@ -7,7 +7,7 @@ import json
 import requests
 
 import pytz
-from langdetect import detect, f
+from langdetect import detect
 from emoji import demojize, EMOJI_DATA
 
 from openai import OpenAI
@@ -261,15 +261,7 @@ User insight metrics:
 Sample analyzed posts:
 {json.dumps(filtered_insights[:5], indent=2)}
 
-Generate exactly 4 personalized digital wellbeing recommendations.
-
-Rules:
-- One sentence each
-- Friendly and supportive
-- Actionable
-- No emojis
-- No numbering
-- One recommendation per line
+Provide detailed anlysis and recomenndations
 """
 
     try:
