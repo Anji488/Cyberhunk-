@@ -7,7 +7,7 @@ import json
 import requests
 
 import pytz
-from langdetect import detect, LangDetectException
+from langdetect import detect, f
 from emoji import demojize, EMOJI_DATA
 
 from openai import OpenAI
@@ -18,9 +18,12 @@ from insights.hf_models import map_sentiment_label
 print(os.getenv("HUGGINGFACE_TOKEN"))
 
 logger = logging.getLogger(__name__)
-
+f
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
 
+# =========================
+# 🧹 TEXT NORMALIZATION
+# =========================
 def remove_variation_selectors(text: str) -> str:
     """Remove emoji variation selectors (U+FE0F)."""
     return text.replace("\ufe0f", "")
@@ -33,6 +36,9 @@ def is_emoji_only(text: str) -> bool:
     )
 
 
+# =========================
+# 📌 CORE NLP ANALYSIS
+# =========================
 def analyze_text(text: str, method="ml") -> dict:
     """
     Safe sentiment analysis with:
@@ -51,6 +57,9 @@ def analyze_text(text: str, method="ml") -> dict:
     original_text = text.strip()
     clean_text = remove_variation_selectors(original_text)
 
+    # -------------------------
+    # Emoji-only handling
+    # -------------------------
     if is_emoji_only(clean_text):
         positive_emojis = {"😍", "🥰", "❤️", "😂", "😊", "👍"}
         negative_emojis = {"😢", "💔", "😠", "😡", "😞"}
@@ -68,9 +77,15 @@ def analyze_text(text: str, method="ml") -> dict:
             "label": label,
         }
 
+    # -------------------------
+    # Emoji → text
+    # -------------------------
     processed_text = demojize(clean_text)
     processed_text = processed_text.replace(":", " ").replace("_", " ")
 
+    # -------------------------
+    # Language detection
+    # -------------------------
     try:
         lang = detect(processed_text)
     except LangDetectException:
@@ -78,9 +93,12 @@ def analyze_text(text: str, method="ml") -> dict:
 
     translated_text = processed_text
 
+    # -------------------------
+    # Lazy translation (safe)
+    # -------------------------
     if lang != "en":
         try:
-            from googletrans import Translator  
+            from googletrans import Translator  # lazy import
             translator = Translator()
             translated_text = translator.translate(
                 processed_text, dest="en"
@@ -89,15 +107,21 @@ def analyze_text(text: str, method="ml") -> dict:
             logger.warning(f"[TRANSLATION FAILED] {e}")
             translated_text = processed_text
 
+    # -------------------------
+    # Sentiment ML (Updated for API)
+    # -------------------------
     label = "neutral"
 
     if method == "ml":
         sentiment_predictor = insight_models.get_sentiment_model()
         if sentiment_predictor:
             try:
+                # The predictor now calls query_hf_api
                 pred = sentiment_predictor(translated_text)
                 
+                # API returns [[{'label': '...', 'score': ...}]]
                 if pred and isinstance(pred, list):
+                    # Handle nested list or single list response
                     data = pred[0][0] if isinstance(pred[0], list) else pred[0]
                     raw_label = data.get("label", "")
                     score = float(data.get("score", 0))
@@ -114,6 +138,9 @@ def analyze_text(text: str, method="ml") -> dict:
     }
 
 
+# =========================
+# 📍 LOCATION DETECTION
+# =========================
 def mentions_location(text: str):
     if not text:
         return None
@@ -140,6 +167,9 @@ def mentions_location(text: str):
     return None
 
 
+# =========================
+# ☣️ TOXICITY (Updated for API)
+# =========================
 def is_toxic(text: str) -> bool:
     if not text:
         return False
@@ -173,6 +203,9 @@ def is_respectful(text: str) -> bool:
     return not is_toxic(text)
 
 
+# =========================
+# 🔐 PRIVACY
+# =========================
 def discloses_personal_info(text: str) -> bool:
     if not text:
         return False
@@ -187,6 +220,9 @@ def discloses_personal_info(text: str) -> bool:
         return False
 
 
+# =========================
+# 🧠 MISINFORMATION (Updated for API)
+# =========================
 def is_potential_misinformation(text: str) -> bool:
     if not text or not text.strip():
         return False
@@ -207,6 +243,7 @@ def is_potential_misinformation(text: str) -> bool:
     return False
 
 
+# METRICS & RECOMMENDATIONS
 def generate_ai_recommendations_openai(insights, insightMetrics):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -297,6 +334,7 @@ def compute_insight_metrics(insights: list):
         {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
     ]
 
+    # ✅ AI-GENERATED RECOMMENDATIONS
     recommendations = generate_ai_recommendations_openai(insights, insightMetrics)
 
     return insightMetrics, recommendations
