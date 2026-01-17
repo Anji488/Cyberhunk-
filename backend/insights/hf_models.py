@@ -14,7 +14,7 @@ def query_hf_api(text, model_id):
         logger.error("HUGGINGFACE_TOKEN is missing!")
         return None
 
-    api_url = f"https://api-inference.huggingface.co/models/{model_id}"
+    api_url = f"https://router.huggingface.co/models/{model_id}"
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     
     # payload with wait_for_model: True handles the 503 'loading' state automatically
