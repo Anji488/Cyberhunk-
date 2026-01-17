@@ -27,9 +27,9 @@ from insights.services import (
 
 MAX_THREADS = 5
 REQUEST_DELAY = 0.3
-DEFAULT_MAX_POSTS = 20
+DEFAULT_MAX_POSTS = 5
 MAX_COMMENTS = 5
-MAX_POSTS_LIMIT = 20
+MAX_POSTS_LIMIT = 5
 MAX_COMMENTS_LIMIT = 5
 MAX_NESTED = 5
 
@@ -44,9 +44,9 @@ def robots_txt(request):
 
 logger = logging.getLogger(__name__)
 
-
+# -----------------------------
 # Helper functions
-
+# -----------------------------
 def safe_request(url: str) -> dict:
     time.sleep(REQUEST_DELAY)
     try:
@@ -100,9 +100,9 @@ def cors_json_response(data, status=200):
     response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response
 
-
+# -----------------------------
 # Main View
-
+# -----------------------------
 @csrf_exempt
 def analyze_facebook(request):
     # 1. Handle Preflight OPTIONS request (Required for CORS)
@@ -128,7 +128,7 @@ def analyze_facebook(request):
             return cors_json_response({"error": "Authorization token missing"}, status=401)
 
         method = request.GET.get("method", "ml")
-        max_posts = min(int(request.GET.get("max_posts", 20)), MAX_POSTS_LIMIT)
+        max_posts = min(int(request.GET.get("max_posts", 10)), MAX_POSTS_LIMIT)
 
         # 3. Fetch Profile (Verify Token with FB)
         profile_url = (
@@ -159,7 +159,7 @@ def analyze_facebook(request):
         
         fb_posts_url = (
             f"https://graph.facebook.com/v19.0/me/posts?"
-            f"fields=message,story,status_type,created_time,object_id&limit=20&access_token={token}"
+            f"fields=message,story,status_type,created_time,object_id&limit=5&access_token={token}"
         )
 
         while fb_posts_url and fetched_posts < max_posts:
@@ -267,7 +267,7 @@ def request_report(request):
 
     token = data.get("token")
     method = data.get("method", "ml")
-    max_posts = int(data.get("max_posts", 20))
+    max_posts = int(data.get("max_posts", 5))
 
     if not token:
         return JsonResponse({"error": "Token required"}, status=400)
