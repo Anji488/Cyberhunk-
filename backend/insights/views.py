@@ -128,7 +128,7 @@ def analyze_facebook(request):
             return cors_json_response({"error": "Authorization token missing"}, status=401)
 
         method = request.GET.get("method", "ml")
-        max_posts = min(int(request.GET.get("max_posts", 10)), MAX_POSTS_LIMIT)
+        max_posts = min(int(request.GET.get("max_posts", 5)), MAX_POSTS_LIMIT)
 
         # 3. Fetch Profile (Verify Token with FB)
         profile_url = (
