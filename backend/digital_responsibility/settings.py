@@ -23,34 +23,33 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-hlqa933e$&irs(+u9)&yemqba(y2!cjw56xy85suu^mv#+n*&x'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+DEBUG = False
 
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders', 
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'corsheaders',
     'rest_framework',
+    'rest_framework.authtoken',
 ]
+
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "corsheaders.middleware.CorsMiddleware", 
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
-
 
 ROOT_URLCONF = 'digital_responsibility.urls'
 
@@ -132,43 +131,38 @@ from decouple import config
 FB_APP_ID = config("FB_APP_ID")
 FB_APP_SECRET = config("FB_APP_SECRET")
 
-BASE_URL = "http://localhost:8000"       # Django backend URL
-FRONTEND_URL = "http://localhost:3000"   # React frontend URL
-
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:3000",  # for local dev
-    "http://localhost:8000" 
-]
-
-CORS_ALLOWED_ORIGINS = [
-    FRONTEND_URL,
-    BASE_URL,
-]
-
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:8000"
-]
+BASE_URL = "https://cyberhunk.onrender.com"       # Django backend URL
+FRONTEND_URL = "https://cyberhunk.vercel.app"   # React frontend URL
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = False
 
 ALLOWED_HOSTS = [
+    "cyberhunk.onrender.com",
     "localhost",
     "127.0.0.1",
-    "cyberhunk.onrender.com",
-    "cyberhunk.vercel.app", 
 ]
+
+CORS_ALLOWED_ORIGINS = [
+    "https://cyberhunk.vercel.app",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://cyberhunk.vercel.app",
+    "https://cyberhunk.onrender.com",
+]
+
 
 
 
 CORS_ALLOW_HEADERS = [
-    'authorization',
-    'content-type',
-    'accept',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
+    "accept",
+    "authorization",
+    "content-type",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 
@@ -176,3 +170,5 @@ SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
+
+APPEND_SLASH = True

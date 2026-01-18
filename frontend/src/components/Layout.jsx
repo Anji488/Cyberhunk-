@@ -47,22 +47,6 @@ export default function Layout({ children }) {
           >
             Home
           </NavLink>
-          <NavLink
-            to="/about"
-            className={({ isActive }) =>
-              `text-gray-700 hover:text-indigo-500 font-semibold transition ${isActive ? "text-indigo-600" : ""}`
-            }
-          >
-            About
-          </NavLink>
-          <NavLink
-            to="/features"
-            className={({ isActive }) =>
-              `text-gray-700 hover:text-indigo-500 font-semibold transition ${isActive ? "text-indigo-600" : ""}`
-            }
-          >
-            Features
-          </NavLink>
 
           {token ? (
             <>
@@ -89,6 +73,22 @@ export default function Layout({ children }) {
                 }
               >
                 Posts
+              </NavLink>
+              <NavLink
+                to="/profile"
+                className={({ isActive }) =>
+                  `text-gray-700 hover:text-indigo-500 font-semibold transition ${isActive ? "text-indigo-600" : ""}`
+                }
+              >
+                Profile
+              </NavLink>
+              <NavLink
+                to="/reports"
+                className={({ isActive }) =>
+                  `text-gray-700 hover:text-indigo-500 font-semibold transition ${isActive ? "text-indigo-600" : ""}`
+                }
+              >
+                Reports
               </NavLink>
 
               <div className="relative" ref={profileRef}>

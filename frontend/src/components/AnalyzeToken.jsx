@@ -9,7 +9,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState(null);
 
-  const BACKEND_URL = "http://localhost:8000";
+  const BACKEND_URL = "https://cyberhunk.onrender.com";
 
   useEffect(() => {
     const token = propToken || Cookies.get("fb_token");
@@ -42,22 +42,23 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
 
       try {
         
-        const res = await axios.get(
-          `${BACKEND_URL}/insights/analyze`,
-          {
-            params: { token, method },
-            headers: {
-                'Accept': 'application/json',
-            },
-            responseType: "json",
-            validateStatus: (status) => status < 500,
-          }
-        );
+        const res = await axios.get(`${BACKEND_URL}/insights/analyze/`, {
+          params: { 
+            method, 
+            max_posts: 5,
+            token: token
+          },
+          headers: { 
+            Authorization: `Bearer ${token}` 
+          },
+          withCredentials: true,
+        });
+
 
         console.log("✅ Raw backend response:", res.data);
 
         if (!res.data || typeof res.data !== "object" || (typeof res.data === 'string' && res.data.includes("ngrok"))) {
-          console.error("❌ Response is not JSON (likely ngrok interstitial or server error):", res.data);
+          console.error("Response is not JSON (likely ngrok interstitial or server error):", res.data);
           throw new Error("NGROK_ISSUE"); 
         }
 
@@ -88,14 +89,27 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
         });
 
         if (onInsightsFetched) onInsightsFetched(finalData);
-
+        try {
+          await axios.post(
+            `${BACKEND_URL}/insights/request-report/`,
+            {
+              token: token,
+              method,
+              max_posts: 5,
+            },
+            { withCredentials: true }
+          );
+          console.log("✅ Report generation triggered");
+        } catch (e) {
+          console.error("Failed to trigger report generation", e);
+        }
       } catch (err) {
-        console.error("❌ Token analysis failed:", err);
-        setError(
-          err.message.includes("NGROK_ISSUE")
-            ? err.message
-            : "Failed to fetch or analyze Facebook data. Check your network or token."
-        );
+        console.error("Token analysis failed:", err);
+        const errorMessage = err.response 
+          ? `Server Error: ${err.response.status}`
+          : "Network/CORS Error: The backend is likely waking up or blocking the request.";
+          
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -129,5 +143,6 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
         <p className="text-sm text-gray-400">Gender: {profile.gender || "N/A"}</p>
       </div>
     </div>
+    
   );
 }

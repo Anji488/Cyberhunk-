@@ -1,147 +1,118 @@
 import logging
 import os
 import re
-from transformers.utils import logging as hf_logging
+import requests
+import time
 
-# ⚙️ Prevent heavy torchvision imports (Render memory saver)
+# Prevent heavy torchvision import
 os.environ["TRANSFORMERS_NO_TORCHVISION_IMPORT"] = "1"
 
 logger = logging.getLogger(__name__)
-hf_logging.set_verbosity_error()
 
-# -----------------------------
-# Cached pipelines
-# -----------------------------
-_sentiment_model = None
-_toxic_model = None
-_misinfo_model = None
-_ner_model = None
+# --- API CONFIGURATION ---
+HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "")
 
-
-# -----------------------------
-# Lazy loader for Hugging Face pipelines
-# -----------------------------
-def _load_pipeline(task, model, **kwargs):
-    """
-    Lazy-load a Hugging Face pipeline only when needed.
-    Ensures CPU compatibility and avoids meta tensor issues.
-    """
-    try:
-        from transformers import pipeline, AutoModelForTokenClassification, AutoModelForSequenceClassification, AutoTokenizer
-        import torch
-
-        logger.info(f"🚀 Loading HF pipeline: {model}")
-
-        device = -1  # CPU
-        dtype = torch.float32  # avoid meta tensors
-
-        # Special handling for token-classification pipelines
-        if task == "token-classification":
-            model_obj = AutoModelForTokenClassification.from_pretrained(
-                model, dtype=dtype, device_map={"": "cpu"}
-            )
-            tokenizer = AutoTokenizer.from_pretrained(model)
-            return pipeline(task, model=model_obj, tokenizer=tokenizer, **kwargs)
-        else:
-            return pipeline(task, model=model, device=device, **kwargs)
-
-    except Exception as e:
-        logger.error(f"❌ Failed to load pipeline '{model}': {e}")
+def query_hf_api(text, model_id):
+    """Send request to Hugging Face Inference API."""
+    if not HF_TOKEN:
+        logger.error("❌ HUGGINGFACE_TOKEN is missing! Set it in environment variables.")
         return None
 
+    if not text or not text.strip():
+        return None
+
+    api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+
+    try:
+        response = requests.post(api_url, headers=headers, json={"inputs": text}, timeout=15)
+
+        # Retry if model is waking up
+        if response.status_code == 503:
+            logger.info(f"⏳ Model {model_id} is waking up, retrying in 5s...")
+            time.sleep(5)
+            response = requests.post(api_url, headers=headers, json={"inputs": text}, timeout=15)
+
+        if response.status_code == 403:
+            logger.error(f"❌ HF API Error 403: Insufficient permissions for {model_id}")
+            return None
+
+        if response.status_code != 200:
+            logger.error(f"❌ HF API Error {response.status_code}: {response.text}")
+            return None
+
+        return response.json()
+    except Exception as e:
+        logger.error(f"❌ HF Request Failed for {model_id}: {e}")
+        return None
+
+
 # -----------------------------
-# Sentiment model
+# Sentiment Model
 # -----------------------------
 def get_sentiment_model():
-    global _sentiment_model
-    if _sentiment_model is None:
-        _sentiment_model = _load_pipeline(
-            "sentiment-analysis", "Anjanie/roberta-sentiment"
-        )
-    return _sentiment_model
+    return lambda text: query_hf_api(text, "Anjanie/roberta-sentiment")
 
 
 def map_sentiment_label(label: str) -> str:
-    """Map model labels to simple human-readable sentiment names."""
     mapping = {
+        "negative": "negative",
+        "neutral": "neutral",
+        "positive": "positive",
         "LABEL_0": "negative",
         "LABEL_1": "neutral",
-        "LABEL_2": "positive",
-        "label_0": "negative",
-        "label_1": "neutral",
-        "label_2": "positive",
-        "NEGATIVE": "negative",
-        "NEUTRAL": "neutral",
-        "POSITIVE": "positive",
+        "LABEL_2": "positive"
     }
-    return mapping.get(label.strip(), label.lower())
+    return mapping.get(label, "neutral")
 
 
 # -----------------------------
-# Toxicity model
+# Toxicity Model
 # -----------------------------
 def get_toxic_model():
-    global _toxic_model
-    if _toxic_model is None:
-        _toxic_model = _load_pipeline(
-            "text-classification", "Anjanie/distilbert-base-uncased-toxicity"
-        )
-    return _toxic_model
+    return lambda text: query_hf_api(text, "Anjanie/distilbert-base-uncased-toxicity")
 
 
 # -----------------------------
-# Misinformation model
+# Misinformation Model
 # -----------------------------
 def get_misinfo_model():
-    global _misinfo_model
-    if _misinfo_model is None:
-        _misinfo_model = _load_pipeline(
-            "text-classification", "Anjanie/bert-base-uncased-misinformation"
-        )
-    return _misinfo_model
+    return lambda text: query_hf_api(text, "Anjanie/bert-base-uncased-misinformation")
 
 
 # -----------------------------
-# NER model
+# NER Model (locations, privacy)
 # -----------------------------
 def get_ner_model():
-    global _ner_model
-    if _ner_model is None:
-        _ner_model = _load_pipeline(
-            "token-classification",
-            "dslim/bert-base-NER",
-            aggregation_strategy="simple",
-        )
-    return _ner_model
+    return lambda text: query_hf_api(text, "dslim/bert-base-NER")
 
 
 # -----------------------------
-# Entity extraction helper
+# Entity Extraction Helper
 # -----------------------------
 def extract_entities(text: str):
-    """
-    Extract locations, emails, and phone numbers from text.
-    """
-    ner = get_ner_model()
-    if not ner:
-        return {"locations": [], "emails": [], "phones": []}
+    ner_func = get_ner_model()
+    locations = []
 
     try:
-        entities = ner(text)
-        locations = [
-            e["word"]
-            for e in entities
-            if e.get("entity_group") in ["LOC", "GPE"]
-        ]
+        entities = ner_func(text)
+        if entities and isinstance(entities, list):
+            for e in entities:
+                label = e.get("entity", "") or e.get("entity_group", "")
+                if any(loc_tag in label.upper() for loc_tag in ["LOC", "GPE"]):
+                    locations.append(e.get("word", "").replace("##", ""))
     except Exception as e:
         logger.error(f"NER extraction failed: {e}")
-        locations = []
 
-    # Regex patterns for emails & phone numbers
+    # PII regex
     email_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
-    phone_pattern = r"\b\d{10}\b"
+    phone_pattern = r"\b\d{10,13}\b"
 
-    emails = re.findall(email_pattern, text)
-    phones = re.findall(phone_pattern, text)
+    emails = re.findall(email_pattern, text or "")
+    phones = re.findall(phone_pattern, text or "")
 
-    return {"locations": locations, "emails": emails, "phones": phones}
+    return {
+        "locations": list(set(locations)),
+        "emails": list(set(emails)),
+        "phones": list(set(phones))
+    }
