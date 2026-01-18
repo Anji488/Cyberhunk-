@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
-const BACKEND_URL = "https://cyberhunk.onrender.com/insights";
+const BACKEND_URL = "http://localhost:8000/insights";
 
 export default function ReportDetails({ reportId }) {
   const [report, setReport] = useState(null);

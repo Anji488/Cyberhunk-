@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import Chart from "react-apexcharts";
 
-const BACKEND = "https://cyberhunk.onrender.com";
+const BACKEND = "http://localhost:8000";
 
 export default function ViewReport() {
   const { id } = useParams();
