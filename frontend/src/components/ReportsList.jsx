@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Cookies from "js-cookie";
 
-const BACKEND_URL = "http://localhost:8000/insights";
+const BACKEND_URL = "https://cyberhunk.onrender.com/insights";
 
 export default function ReportsList({ onSelectReport }) {
   const [reports, setReports] = useState([]);

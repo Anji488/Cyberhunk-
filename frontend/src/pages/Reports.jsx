@@ -6,7 +6,7 @@ import download from "downloadjs";
 import { motion } from "framer-motion";
 import InsightCard from "@/components/InsightCard";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://cyberhunk.onrender.com";
 
 export default function ReportsPage({ token }) {
   const [profile, setProfile] = useState(null);
