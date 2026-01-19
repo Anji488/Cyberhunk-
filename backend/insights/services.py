@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
 
 
-# 🧹 TEXT NORMALIZATION
+# TEXT NORMALIZATION
 
 def remove_variation_selectors(text: str) -> str:
     """Remove emoji variation selectors (U+FE0F)."""
@@ -37,7 +37,7 @@ def is_emoji_only(text: str) -> bool:
 
 
 
-# 📌 CORE NLP ANALYSIS
+# CORE NLP ANALYSIS
 
 def analyze_text(text: str, method="ml") -> dict:
     if not text or not text.strip():
@@ -56,7 +56,7 @@ def analyze_text(text: str, method="ml") -> dict:
     }
 
 
-# 📍 LOCATION DETECTION
+# LOCATION DETECTION
 
 def mentions_location(text: str):
     result = analyze_text_gradio(text)
@@ -67,7 +67,7 @@ def mentions_location(text: str):
 
 
 
-# ☣️ TOXICITY (Updated for API)
+# TOXICITY (Updated for API)
 
 def is_toxic(text: str) -> bool:
     result = analyze_text_gradio(text)
@@ -79,7 +79,7 @@ def is_respectful(text: str) -> bool:
 
 
 
-# 🔐 PRIVACY
+# PRIVACY
 def discloses_personal_info(text: str) -> bool:
     result = analyze_text_gradio(text)
     return bool(result.get("phones") or result.get("emails"))
@@ -87,7 +87,7 @@ def discloses_personal_info(text: str) -> bool:
 
 
 
-# 🧠 MISINFORMATION (Updated for API)
+# MISINFORMATION (Updated for API)
 
 def is_potential_misinformation(text: str) -> bool:
     result = analyze_text_gradio(text)
