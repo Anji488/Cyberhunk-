@@ -14,9 +14,6 @@ from emoji import demojize, EMOJI_DATA
 
 from openai import OpenAI
 
-from insights import hf_models as insight_models
-from insights.hf_models import map_sentiment_label
-
 from insights.gradio_models import analyze_text_gradio
 print(os.getenv("HUGGINGFACE_TOKEN"))
 
