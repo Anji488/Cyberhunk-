@@ -15,15 +15,15 @@ MONGO_URI = f"mongodb+srv://{username}:{password}@{cluster}/{database}?retryWrit
 try:
     client = MongoClient(
         MONGO_URI,
-        serverSelectionTimeoutMS=5000  # ⏱ force fast failure
+        serverSelectionTimeoutMS=5000  
     )
 
-    # 🔥 FORCE CONNECTION
+    # FORCE CONNECTION
     client.admin.command("ping")
-    logger.info("✅ MongoDB CONNECTED")
+    logger.info("MongoDB CONNECTED")
 
 except Exception as e:
-    logger.error(f"❌ MongoDB CONNECTION FAILED: {e}")
+    logger.error(f"MongoDB CONNECTION FAILED: {e}")
     raise  # VERY IMPORTANT
 
 db = client[database]
