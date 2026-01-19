@@ -3,7 +3,6 @@ import requests
 import logging
 from django.http import JsonResponse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from insights import hf_models as models  # Hugging Face models
 
 import uuid
 import json
@@ -44,9 +43,9 @@ def robots_txt(request):
 
 logger = logging.getLogger(__name__)
 
-# -----------------------------
+
 # Helper functions
-# -----------------------------
+
 def safe_request(url: str) -> dict:
     time.sleep(REQUEST_DELAY)
     try:
@@ -87,22 +86,22 @@ def fetch_nested_comments(comment: dict, token: str) -> list:
             nested_comments.extend(fetch_nested_comments(nested, token))
     return nested_comments
 
-# ===================================
+
 # CORS SAFE JSON RESPONSE HELPER
-# ===================================
+
 def cors_json_response(data, status=200):
     """Ensures CORS headers are present even if the view catches an error."""
     response = JsonResponse(data, status=status)
     # Match your frontend Vercel URL
-    response["Access-Control-Allow-Origin"] = "https://cyberhunk.vercel.app"
+    response["Access-Control-Allow-Origin"] = "http://localhost:3000"
     response["Access-Control-Allow-Credentials"] = "true"
     response["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response
 
-# -----------------------------
+
 # Main View
-# -----------------------------
+
 @csrf_exempt
 def analyze_facebook(request):
     # 1. Handle Preflight OPTIONS request (Required for CORS)
@@ -274,8 +273,8 @@ def request_report(request):
 
     report_id = str(uuid.uuid4())
 
-    # ✅ NOW THIS IS SAFE
-    logger.info(f"🚀 Starting report generation | report_id={report_id}")
+    # NOW THIS IS SAFE
+    logger.info(f"Starting report generation | report_id={report_id}")
 
     try:
         generate_report(
