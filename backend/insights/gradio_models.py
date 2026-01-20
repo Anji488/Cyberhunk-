@@ -1,6 +1,6 @@
 # backend/insights/gradio_models.py
 
-from gradio_client import Client
+from gradio_client import Client, ClientException, NetworkError
 import os
 import logging
 from functools import lru_cache
@@ -45,17 +45,12 @@ def analyze_text_gradio_cached(text: str) -> dict:
     return analyze_text_gradio(text)
 
 def analyze_text_gradio(text: str) -> dict:
-    """
-    Normalized Gradio API output with emoji support
-    """
     if not text or not text.strip():
         return {
             "label": "neutral",
             "toxic": False,
             "misinformation": False,
-            "entities": [],
-            "phones": [],
-            "emails": [],
+            "entities": [], "phones": [], "emails": []
         }
 
     try:
@@ -64,37 +59,27 @@ def analyze_text_gradio(text: str) -> dict:
             logger.warning("[GRADIO ERROR] Client not initialized.")
             return {}
 
-        raw = client.predict(text=text, api_name="/analyze_text")
+        raw = client.predict(text=text, api_name="/analyze_text", timeout=30)
         if not isinstance(raw, dict):
             logger.warning(f"[GRADIO ERROR] Unexpected response type: {type(raw)}")
             return {}
 
-        
         # Sentiment
-        
         sentiment_raw = raw.get("sentiment")
         sentiment = SENTIMENT_MAP.get(sentiment_raw, "neutral")
-
-        # Emoji override
         emoji_override = emoji_sentiment(text)
         if emoji_override:
             sentiment = emoji_override
 
-        
         # Toxicity
-        
         toxicity_raw = raw.get("toxicity")
         toxic = TOXICITY_MAP.get(toxicity_raw, False)
 
-        
         # Misinformation
-        
         misinfo_raw = raw.get("misinformation")
         misinformation = MISINFO_MAP.get(misinfo_raw, False)
 
-        
         # Entities & Personal Info
-        
         entities = raw.get("entities", [])
         phones = raw.get("phones", [])
         emails = raw.get("emails", [])
@@ -108,6 +93,9 @@ def analyze_text_gradio(text: str) -> dict:
             "emails": emails,
         }
 
+    except (ClientException, NetworkError, TimeoutError) as e:
+        logger.error(f"[GRADIO TIMEOUT] {e}")
+        return {"label": "neutral", "toxic": False, "misinformation": False, "entities": [], "phones": [], "emails": []}
     except Exception as e:
         logger.error(f"[GRADIO ERROR] {e}")
-        return {}
+        return {"label": "neutral", "toxic": False, "misinformation": False, "entities": [], "phones": [], "emails": []}
