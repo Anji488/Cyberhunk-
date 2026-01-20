@@ -87,7 +87,7 @@ export default function ProfilePage() {
     bannerColor = "bg-blue-400";
   }
 
-  // ---------- SHARE IMAGE ----------
+  //  SHARE IMAGE
   const shareImage = async () => {
     try {
       if (!exportRef.current) return;
@@ -110,7 +110,7 @@ export default function ProfilePage() {
     }
   };
 
-  // ---------- DOWNLOAD IMAGE ----------
+  // DOWNLOAD IMAGE
   const downloadImage = () => {
     if (!exportRef.current) return;
     htmlToImage
@@ -119,7 +119,7 @@ export default function ProfilePage() {
       .catch((err) => console.error(err));
   };
 
-  // ---------- Chart Data ----------
+  // Chart Data
   const sentimentCounts = { positive: 0, negative: 0, neutral: 0 };
   const postsPerDay = {};
   const engagementPerWeek = [0, 0, 0, 0];

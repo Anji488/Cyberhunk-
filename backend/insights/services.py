@@ -6,24 +6,24 @@ from datetime import datetime
 import json
 import requests
 
+import numpy as np
 import pytz
+from dateutil import parser
 from langdetect import detect
 from emoji import demojize, EMOJI_DATA
 
 from openai import OpenAI
 
-from insights import hf_models as insight_models
-from insights.hf_models import map_sentiment_label
-
+from insights.gradio_models import analyze_text_gradio
 print(os.getenv("HUGGINGFACE_TOKEN"))
 
 logger = logging.getLogger(__name__)
 
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
 
-# =========================
-# 🧹 TEXT NORMALIZATION
-# =========================
+
+# TEXT NORMALIZATION
+
 def remove_variation_selectors(text: str) -> str:
     """Remove emoji variation selectors (U+FE0F)."""
     return text.replace("\ufe0f", "")
@@ -36,17 +36,10 @@ def is_emoji_only(text: str) -> bool:
     )
 
 
-# =========================
-# 📌 CORE NLP ANALYSIS
-# =========================
-def analyze_text(text: str, method="ml") -> dict:
-    """
-    Safe sentiment analysis with:
-    - emoji handling
-    - lazy translation
-    - fail-safe ML execution
-    """
 
+# CORE NLP ANALYSIS
+
+def analyze_text(text: str, method="ml") -> dict:
     if not text or not text.strip():
         return {
             "original": text,
@@ -54,264 +47,108 @@ def analyze_text(text: str, method="ml") -> dict:
             "label": "neutral",
         }
 
-    original_text = text.strip()
-    clean_text = remove_variation_selectors(original_text)
-
-    # -------------------------
-    # Emoji-only handling
-    # -------------------------
-    if is_emoji_only(clean_text):
-        positive_emojis = {"😍", "🥰", "❤️", "😂", "😊", "👍"}
-        negative_emojis = {"😢", "💔", "😠", "😡", "😞"}
-
-        if any(e in clean_text for e in positive_emojis):
-            label = "positive"
-        elif any(e in clean_text for e in negative_emojis):
-            label = "negative"
-        else:
-            label = "neutral"
-
-        return {
-            "original": original_text,
-            "translated": original_text,
-            "label": label,
-        }
-
-    # -------------------------
-    # Emoji → text
-    # -------------------------
-    processed_text = demojize(clean_text)
-    processed_text = processed_text.replace(":", " ").replace("_", " ")
-
-    # -------------------------
-    # Language detection
-    # -------------------------
-    try:
-        lang = detect(processed_text)
-    except LangDetectException:
-        lang = "en"
-
-    translated_text = processed_text
-
-    # -------------------------
-    # Lazy translation (safe)
-    # -------------------------
-    if lang != "en":
-        try:
-            from googletrans import Translator  # lazy import
-            translator = Translator()
-            translated_text = translator.translate(
-                processed_text, dest="en"
-            ).text
-        except Exception as e:
-            logger.warning(f"[TRANSLATION FAILED] {e}")
-            translated_text = processed_text
-
-    # -------------------------
-    # Sentiment ML (Updated for API)
-    # -------------------------
-    label = "neutral"
-
-    if method == "ml":
-        sentiment_predictor = insight_models.get_sentiment_model()
-        if sentiment_predictor:
-            try:
-                # The predictor now calls query_hf_api
-                pred = sentiment_predictor(translated_text)
-                
-                # API returns [[{'label': '...', 'score': ...}]]
-                if pred and isinstance(pred, list):
-                    # Handle nested list or single list response
-                    data = pred[0][0] if isinstance(pred[0], list) else pred[0]
-                    raw_label = data.get("label", "")
-                    score = float(data.get("score", 0))
-                    mapped = map_sentiment_label(raw_label)
-
-                    label = mapped if score >= 0.5 else mapped
-            except Exception as e:
-                logger.error(f"[SENTIMENT ERROR] {e}")
+    result = analyze_text_gradio(text)
 
     return {
-        "original": original_text,
-        "translated": translated_text,
-        "label": label,
+        "original": text,
+        "translated": text,
+        "label": result.get("label", "neutral"),
     }
 
 
-# =========================
-# 📍 LOCATION DETECTION
-# =========================
+# LOCATION DETECTION
+
 def mentions_location(text: str):
-    if not text:
-        return None
-
-    try:
-        entities = insight_models.extract_entities(text)
-        locations = entities.get("locations") if entities else None
-        if locations:
-            return locations[0]
-    except Exception as e:
-        logger.warning(f"[NER ERROR] {e}")
-
-    fallback_cities = [
-        "colombo", "kandy", "galle", "jaffna", "batticaloa",
-        "trincomalee", "negombo", "kurunegala", "anuradhapura",
-        "ratnapura", "badulla", "matara",
-    ]
-
-    lowered = text.lower()
-    for city in fallback_cities:
-        if city in lowered:
-            return city.capitalize()
-
+    result = analyze_text_gradio(text)
+    for ent in result.get("entities", []):
+        if ent.get("entity") == "LOCATION":
+            return ent.get("word")
     return None
 
 
-# =========================
-# ☣️ TOXICITY (Updated for API)
-# =========================
+
+# TOXICITY (Updated for API)
+
 def is_toxic(text: str) -> bool:
-    if not text:
-        return False
-
-    toxic_keywords = {
-        "shit", "fuck", "bitch", "asshole", "bastard"
-    }
-
-    lowered = text.lower()
-    keyword_match = any(word in lowered for word in toxic_keywords)
-
-    toxic_predictor = insight_models.get_toxic_model()
-    model_prediction = False
-
-    if toxic_predictor:
-        try:
-            pred = toxic_predictor(text)
-            if pred and isinstance(pred, list):
-                # API response handling
-                data = pred[0][0] if isinstance(pred[0], list) else pred[0]
-                label = str(data.get("label", "")).lower()
-                # Check for 'toxic' label or high scores in specific labels
-                model_prediction = "toxic" in label or label == "label_1"
-        except Exception as e:
-            logger.error(f"[TOXIC MODEL ERROR] {e}")
-
-    return keyword_match or model_prediction
+    result = analyze_text_gradio(text)
+    return bool(result.get("toxic", False))
 
 
 def is_respectful(text: str) -> bool:
     return not is_toxic(text)
 
 
-# =========================
-# 🔐 PRIVACY
-# =========================
+
+# PRIVACY
 def discloses_personal_info(text: str) -> bool:
-    if not text:
-        return False
-
-    try:
-        entities = insight_models.extract_entities(text)
-        return bool(
-            entities.get("phones") or entities.get("emails")
-        )
-    except Exception as e:
-        logger.warning(f"[PRIVACY CHECK ERROR] {e}")
-        return False
+    result = analyze_text_gradio(text)
+    return bool(result.get("phones") or result.get("emails"))
 
 
-# =========================
-# 🧠 MISINFORMATION (Updated for API)
-# =========================
+
+
+# MISINFORMATION (Updated for API)
+
 def is_potential_misinformation(text: str) -> bool:
-    if not text or not text.strip():
-        return False
+    result = analyze_text_gradio(text)
+    return bool(result.get("misinformation", False))
 
-    misinfo_predictor = insight_models.get_misinfo_model()
-    if not misinfo_predictor:
-        return False
-
-    try:
-        pred = misinfo_predictor(text)
-        if pred and isinstance(pred, list):
-            data = pred[0][0] if isinstance(pred[0], list) else pred[0]
-            label = str(data.get("label", "")).lower()
-            return label in {"misinfo", "misinformation", "true", "yes", "1", "label_1"}
-    except Exception as e:
-        logger.error(f"[MISINFO ERROR] {e}")
-
-    return False
 
 
 # METRICS & RECOMMENDATIONS
 def generate_ai_recommendations_openai(insights, insightMetrics):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
+ 
     filtered_insights = [
         item for item in insights
         if item.get("translated") and item["translated"].strip()
     ] or [{"translated": "User has a few short posts."}]
-
+ 
     prompt = f"""
 You are a friendly AI assistant analyzing social media behavior.
-
+ 
 User insight metrics:
 {json.dumps(insightMetrics, indent=2)}
-
+ 
 Sample analyzed posts:
 {json.dumps(filtered_insights[:5], indent=2)}
-
-Provide detailed analysis and recommendations to help the user improve their online presence.
+ 
+Provide highly detailed analysis and recommendations to help the user improve their online presence using at least 5 paragraphs.
 """
-
+ 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",   
+            model="gpt-4o-mini",  
             messages=[
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=200,
+            # max_tokens=200,
         )
-
+ 
         text = response.choices[0].message.content.strip()
-
+        return text
     except Exception as e:
         logger.error(f"[OPENAI ERROR] {e}")
-        return []
-
-    recommendations = [
-        {"text": line.strip()}
-        for line in text.split("\n")
-        if line.strip()
-    ]
-
-    return recommendations[:4]
+        return ""
 
 def compute_insight_metrics(insights: list):
-    total = max(len(insights), 1)
+    posts = [i for i in insights if i.get("type") == "post"]
+    total_posts = len(posts)
+    total_items = max(len(insights), 1)
 
     sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
     night_posts = 0
     location_mentions = 0
     respectful_count = 0
 
+    
+    # Sentiment & behavior (ALL)
+    
     for item in insights:
         label = (item.get("label") or "").lower()
         if label in sentiment_counts:
             sentiment_counts[label] += 1
-
-        ts = item.get("timestamp")
-        if ts:
-            try:
-                dt = datetime.fromisoformat(ts.replace("Z", ""))
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=pytz.UTC)
-                local_dt = dt.astimezone(LOCAL_TZ)
-                if local_dt.hour >= 23 or local_dt.hour < 6:
-                    night_posts += 1
-            except Exception:
-                pass
 
         if item.get("mentions_location"):
             location_mentions += 1
@@ -319,17 +156,71 @@ def compute_insight_metrics(insights: list):
         if item.get("is_respectful"):
             respectful_count += 1
 
+    
+    # Posting habits (POSTS ONLY)
+    
+    for post in posts:
+        ts = post.get("timestamp")
+        if not ts:
+            continue
+
+        try:
+            dt = parser.isoparse(ts)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=pytz.UTC)
+
+            local_dt = dt.astimezone(LOCAL_TZ)
+
+            if local_dt.hour >= 23 or local_dt.hour < 6:
+                night_posts += 1
+
+        except Exception as e:
+            logger.warning(f"Timestamp parse failed: {ts} | {e}")
+
+    
+    # Metric Calculations
+    
+
+    happy_posts_score = round(
+        (sentiment_counts["positive"] / total_items) * 100
+    )
+
+    if total_posts == 0:
+        good_posting_habits_score = 100
+    else:
+        late_ratio = night_posts / total_posts
+
+        # Winsorized bounds (tunable)
+        LOWER = 0.05   # ~90th percentile good users
+        UPPER = 0.60   # heavy late-night posters
+
+        late_ratio = max(LOWER, min(late_ratio, UPPER))
+
+        normalized = 1 - ((late_ratio - LOWER) / (UPPER - LOWER))
+        good_posting_habits_score = round(normalized * 100)
+
+    privacy_care_score = round(
+        100 - (location_mentions / total_items) * 100
+    )
+
+    respectful_score = round(
+        (respectful_count / total_items) * 100
+    )
+
     insightMetrics = [
-        {"title": "Happy Posts", "value": round((sentiment_counts["positive"] / total) * 100)},
-        {"title": "Good Posting Habits", "value": round(100 - (night_posts / total) * 100)},
-        {"title": "Privacy Care", "value": round(100 - (location_mentions / total) * 100)},
-        {"title": "Being Respectful", "value": round((respectful_count / total) * 100)},
+        {"title": "Happy Posts", "value": happy_posts_score},
+        {"title": "Good Posting Habits", "value": good_posting_habits_score},
+        {"title": "Privacy Care", "value": privacy_care_score},
+        {"title": "Being Respectful", "value": respectful_score},
     ]
 
-    # ✅ AI-GENERATED RECOMMENDATIONS
-    recommendations = generate_ai_recommendations_openai(insights, insightMetrics)
+    recommendations = generate_ai_recommendations_openai(
+        insights,
+        insightMetrics
+    )
 
     return insightMetrics, recommendations
+
 
 def fetch_profile(token):
     url = (
