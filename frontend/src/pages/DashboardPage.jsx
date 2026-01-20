@@ -32,12 +32,12 @@ export default function DashboardPage() {
   let bannerText = "Good Digital Behavior";
   let bannerColor = "bg-green-400";
   if (score < 40) {
-    bannerText = "Needs Attention";
+    bannerText = "More Needs Attention";
     bannerColor = "bg-red-400";
   }else if (score < 60) {
     bannerText = "Needs Attention";
     bannerColor = "bg-yellow-400";
-  }else if (score < 60) {
+  }else if (score < 70) {
     bannerText = "Medium Behavior";
     bannerColor = "bg-pink-400";
   } else if (score < 80) {

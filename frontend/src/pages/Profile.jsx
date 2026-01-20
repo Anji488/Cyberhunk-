@@ -29,6 +29,7 @@ import {
 } from "chart.js";
 import { useInsights } from "../context/InsightsContext";
 import InsightCard from "@/components/InsightCard";
+import ReactMarkdown from "react-markdown";
 
 ChartJS.register(
   CategoryScale,
@@ -50,7 +51,7 @@ export default function ProfilePage() {
   const {
     insights = [],
     insightMetrics = [],
-    recommendations = [],
+    recommendations = "",
     profile,
     totalPosts = 0,
     totalComments = 0
@@ -316,20 +317,46 @@ export default function ProfilePage() {
           <h3 className="text-2xl font-bold mb-4 text-indigo-400">
             Personalized Recommendations
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {recommendations.map((rec, idx) => {
-              const Icon = ICONS[idx % ICONS.length];
-              return (
-                <div
-                  key={idx}
-                  className="flex items-center gap-3 bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-4 shadow-md"
-                >
-                  <Icon className="w-6 h-6 text-pink-400" />
-                  <span className="text-gray-700 font-medium">{rec.text}</span>
-                </div>
-              );
-            })}
-          </div>
+          <div className="prose prose-indigo max-w-none">
+              <ReactMarkdown
+                components={{
+                  h2: ({ children }) => (
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, ease: "easeOut" }}
+                      className="mt-10 mb-4"
+                    >
+                      <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                        {children}
+                      </h2>
+    
+                      <motion.div
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: 1 }}
+                        transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+                        className="block origin-left h-[3px] w-16 bg-indigo-400 rounded-full mt-2"
+                      />
+                    </motion.div>
+                  ),
+    
+                  p: ({ children }) => (
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3, delay: 0.1 }}
+                      className="text-gray-700 leading-relaxed mb-4 text-base"
+                    >
+                      {children}
+                    </motion.p>
+                  ),
+    
+                  hr: () => null, 
+                }}
+              >
+                {recommendations}
+              </ReactMarkdown>
+            </div>
         </div>
 
       </div>

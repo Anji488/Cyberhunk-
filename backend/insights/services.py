@@ -19,8 +19,8 @@ from insights.gradio_models import analyze_text_gradio
 
 load_dotenv()
 
-print(os.getenv("HUGGINGFACE_TOKEN"))
-print(os.getenv("OPENAI_API_KEY_2"))
+# print(os.getenv("HUGGINGFACE_TOKEN"))
+# print(os.getenv("OPENAI_API_KEY_2"))
 logger = logging.getLogger(__name__)
 
 LOCAL_TZ = pytz.timezone("Asia/Colombo")

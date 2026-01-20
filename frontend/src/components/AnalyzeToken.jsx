@@ -57,9 +57,9 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
 
         console.log("✅ Raw backend response:", res.data);
 
-        if (!res.data || typeof res.data !== "object" || (typeof res.data === 'string' && res.data.includes("ngrok"))) {
-          console.error("Response is not JSON (likely ngrok interstitial or server error):", res.data);
-          throw new Error("NGROK_ISSUE"); 
+        if (!res.data || typeof res.data !== "object" || (typeof res.data === 'string' && res.data.includes("server"))) {
+          console.error("Response is not JSON (likely server error):", res.data);
+          throw new Error("ISSUE"); 
         }
 
         const profileData = res.data?.profile || null;
