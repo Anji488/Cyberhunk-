@@ -5,6 +5,7 @@ import random
 from datetime import datetime
 import json
 import requests
+from dotenv import load_dotenv
 
 import numpy as np
 import pytz
@@ -15,8 +16,11 @@ from emoji import demojize, EMOJI_DATA
 from openai import OpenAI
 
 from insights.gradio_models import analyze_text_gradio
-print(os.getenv("HUGGINGFACE_TOKEN"))
 
+load_dotenv()
+
+print(os.getenv("HUGGINGFACE_TOKEN"))
+print(os.getenv("OPENAI_API_KEY_2"))
 logger = logging.getLogger(__name__)
 
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
@@ -97,7 +101,7 @@ def is_potential_misinformation(text: str) -> bool:
 
 # METRICS & RECOMMENDATIONS
 def generate_ai_recommendations_openai(insights, insightMetrics):
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY_2"))
  
     filtered_insights = [
         item for item in insights
@@ -106,15 +110,31 @@ def generate_ai_recommendations_openai(insights, insightMetrics):
  
     prompt = f"""
 You are a friendly AI assistant analyzing social media behavior.
- 
+
+Write the response in clear, well-structured sections using markdown.
+
+Rules:
+- Start with a short introductory paragraph.
+- Use markdown headings (###) for each section.
+- Each section should be 3–4 sentences.
+- Use a friendly, supportive, and professional tone.
+- Do NOT use emojis.
+- Do NOT write everything in one paragraph.
+
 User insight metrics:
 {json.dumps(insightMetrics, indent=2)}
- 
+
 Sample analyzed posts:
 {json.dumps(filtered_insights[:5], indent=2)}
- 
-Provide highly detailed analysis and recommendations to help the user improve their online presence using at least 5 paragraphs.
+
+Sections to include (use these exact titles):
+### Positive Engagement and Content
+### Posting Habits and Consistency
+### Privacy and Personal Information
+### Respectful Communication
+### Overall Recommendations
 """
+
  
     try:
         response = client.chat.completions.create(
@@ -123,7 +143,7 @@ Provide highly detailed analysis and recommendations to help the user improve th
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            # max_tokens=200,
+            max_tokens=500,
         )
  
         text = response.choices[0].message.content.strip()
@@ -131,9 +151,12 @@ Provide highly detailed analysis and recommendations to help the user improve th
     except Exception as e:
         logger.error(f"[OPENAI ERROR] {e}")
         return ""
-
+      
 def compute_insight_metrics(insights: list):
-    posts = [i for i in insights if i.get("type") == "post"]
+    posts = [
+        i for i in insights
+        if str(i.get("type", "")).lower() == "post"
+    ]
     total_posts = len(posts)
     total_items = max(len(insights), 1)
 
@@ -160,12 +183,16 @@ def compute_insight_metrics(insights: list):
     # Posting habits (POSTS ONLY)
     
     for post in posts:
-        ts = post.get("timestamp")
+        ts = (
+            post.get("timestamp")
+            or post.get("time")
+            or post.get("created_time")
+        )
         if not ts:
             continue
 
         try:
-            dt = parser.isoparse(ts)
+            dt = parser.parse(ts) 
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=pytz.UTC)
 
@@ -176,8 +203,7 @@ def compute_insight_metrics(insights: list):
 
         except Exception as e:
             logger.warning(f"Timestamp parse failed: {ts} | {e}")
-
-    
+        
     # Metric Calculations
     
 
@@ -190,14 +216,20 @@ def compute_insight_metrics(insights: list):
     else:
         late_ratio = night_posts / total_posts
 
-        # Winsorized bounds (tunable)
-        LOWER = 0.05   # ~90th percentile good users
-        UPPER = 0.60   # heavy late-night posters
+        if late_ratio == 0:
+            good_posting_habits_score = 100
+        elif late_ratio <= 0.2:
+            good_posting_habits_score = 80
+        elif late_ratio <= 0.4:
+            good_posting_habits_score = 60
+        elif late_ratio <= 0.6:
+            good_posting_habits_score = 40
+        else:
+            good_posting_habits_score = 20
 
-        late_ratio = max(LOWER, min(late_ratio, UPPER))
-
-        normalized = 1 - ((late_ratio - LOWER) / (UPPER - LOWER))
-        good_posting_habits_score = round(normalized * 100)
+    logger.info(
+        f"Posting habits debug → total_posts={total_posts}, night_posts={night_posts}"
+    )
 
     privacy_care_score = round(
         100 - (location_mentions / total_items) * 100

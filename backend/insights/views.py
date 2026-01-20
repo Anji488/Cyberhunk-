@@ -93,7 +93,7 @@ def cors_json_response(data, status=200):
     """Ensures CORS headers are present even if the view catches an error."""
     response = JsonResponse(data, status=status)
     # Match your frontend Vercel URL
-    response["Access-Control-Allow-Origin"] = "https://cyberhunk.vercel.app"
+    response["Access-Control-Allow-Origin"] = "http://localhost:3000"
     response["Access-Control-Allow-Credentials"] = "true"
     response["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
@@ -104,6 +104,7 @@ def cors_json_response(data, status=200):
 
 @csrf_exempt
 def analyze_facebook(request):
+    # 1. Handle Preflight OPTIONS request (Required for CORS)
     if request.method == "OPTIONS":
         return cors_json_response({})
 
@@ -111,106 +112,127 @@ def analyze_facebook(request):
         return cors_json_response({"error": "Method not allowed"}, status=405)
 
     try:
-        
-        # Auth
-        
+        # 2. Flexible Token Extraction (Fixes the 401 issue)
         token = None
         auth_header = request.headers.get("Authorization")
-
+        
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ", 1)[1]
-
+        
+        # Fallbacks
         token = token or request.GET.get("token") or request.COOKIES.get("fb_token")
 
         if not token:
+            logger.error("401 Trace: No token found in headers, params, or cookies")
             return cors_json_response({"error": "Authorization token missing"}, status=401)
 
         method = request.GET.get("method", "ml")
+        max_posts = min(int(request.GET.get("max_posts", 10)), MAX_POSTS_LIMIT)
 
-        # 🔒 HARD SAFETY LIMIT (DO NOT REMOVE)
-        MAX_ML_POSTS = 1
-        max_posts = min(int(request.GET.get("max_posts", 1)), MAX_ML_POSTS)
-
-        
-        # Verify Token
-        
-        profile_res = requests.get(
-            "https://graph.facebook.com/v19.0/me",
-            params={
-                "fields": "id,name,birthday,gender,picture.width(200).height(200)",
-                "access_token": token
-            },
-            timeout=10
+        # 3. Fetch Profile (Verify Token with FB)
+        profile_url = (
+            f"https://graph.facebook.com/v19.0/me?"
+            f"fields=id,name,birthday,gender,picture.width(200).height(200)"
+            f"&access_token={token}"
         )
+        try:
+            profile_res = requests.get(profile_url, timeout=10)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Facebook connection failed: {e}")
+            return JsonResponse({
+                "error": "Facebook API unreachable",
+                "details": "Backend cannot connect to Facebook right now. Please retry."
+            }, status=503)
 
+        
         if profile_res.status_code != 200:
-            return cors_json_response(
-                {"error": "Facebook rejected token or expired"},
-                status=401
-            )
-
+            logger.error(f"FB API Error: {profile_res.text}")
+            return cors_json_response({"error": "Facebook rejected token or it expired"}, status=401)
+        
         profile_data = profile_res.json()
 
-        
-        # Fetch Posts
-        
+        # 4. Fetch Posts & Sequential Analysis
         insights = []
+        shared_cache = {}
         fetched_posts = 0
-
+        
         fb_posts_url = (
             f"https://graph.facebook.com/v19.0/me/posts?"
-            f"fields=message,story,status_type,created_time,object_id"
-            f"&limit={max_posts}&access_token={token}"
+            f"fields=message,story,status_type,created_time,object_id&limit=5&access_token={token}"
         )
 
-        res = requests.get(fb_posts_url, timeout=30)
-        if res.status_code != 200:
-            raise Exception("Failed to fetch Facebook posts")
-
-        posts = res.json().get("data", [])
-
-        for post in posts:
-            if fetched_posts >= max_posts:
-                break
-
-            content = post.get("message") or post.get("story") or ""
-
+        while fb_posts_url and fetched_posts < max_posts:
+            res = requests.get(fb_posts_url, timeout=30)
+            if res.status_code != 200: break
             
-            # 🔥 SINGLE ML CALL (CRITICAL)
-            
-            try:
-                ml_result = analyze_text(content, method)
-            except Exception as e:
-                logger.warning(f"ML failed, falling back: {e}")
-                ml_result = {
-                    "original": content,
-                    "label": "neutral",
-                    "toxic": False,
-                    "misinformation": False,
-                }
+            data = res.json()
+            posts = data.get("data", [])
 
-            insight = {
-                **ml_result,
-                "timestamp": post.get("created_time"),
-                "status_type": post.get("status_type"),
-                "type": "post",
+            for post in posts:
+                if fetched_posts >= max_posts: break
+                
+                content = post.get("message") or post.get("story") or ""
+                
+                # Handle shared stories
+                if post.get("status_type") == "shared_story":
+                    shared_id = post.get("object_id")
+                    if shared_id and shared_id not in shared_cache:
+                        shared_data = requests.get(
+                            f"https://graph.facebook.com/v19.0/{shared_id}?fields=message&access_token={token}",
+                            timeout=5
+                        ).json()
+                        shared_cache[shared_id] = shared_data.get("message", "")
+                    content = shared_cache.get(shared_id, content)
 
-                # ✅ Reuse ML result (NO NEW CALLS)
-                "is_respectful": not ml_result.get("toxic", False),
-                "mentions_location": mentions_location(content),
-                "privacy_disclosure": discloses_personal_info(content),
-                "toxic": ml_result.get("toxic", False),
-                "misinformation_risk": ml_result.get("misinformation", False),
-            }
+                # ML Analysis (Post)
+                try:
+                    analysis = analyze_text(content, method)
+                except Exception as e:
+                    logger.warning(f"ML Analysis failed: {e}")
+                    analysis = {"original": content, "label": "neutral"}
 
-            insights.append(insight)
-            fetched_posts += 1
+                analysis.update({
+                    "timestamp": post.get("created_time"),
+                    "is_respectful": is_respectful(content),
+                    "mentions_location": mentions_location(content),
+                    "privacy_disclosure": discloses_personal_info(content),
+                    "toxic": is_toxic(content),
+                    "misinformation_risk": is_potential_misinformation(content),
+                    "status_type": post.get("status_type"),
+                    "type": "post"
+                })
+                insights.append(analysis)
 
-            time.sleep(REQUEST_DELAY)
+                # 5. Fetch & Analyze Comments (Sequential to avoid OOM crash)
+                comment_url = (
+                    f"https://graph.facebook.com/v19.0/{post['id']}/comments?"
+                    f"fields=message,created_time&limit={MAX_COMMENTS_LIMIT}&access_token={token}"
+                )
+                c_res = requests.get(comment_url, timeout=20)
+                if c_res.status_code == 200:
+                    for c in c_res.json().get("data", []):
+                        c_text = c.get("message", "")
+                        try:
+                            c_analysis = analyze_text(c_text, method)
+                        except:
+                            c_analysis = {"original": c_text, "label": "neutral"}
+                        
+                        c_analysis.update({
+                            "timestamp": c.get("created_time"),
+                            "is_respectful": is_respectful(c_text),
+                            "mentions_location": mentions_location(c_text),
+                            "privacy_disclosure": discloses_personal_info(c_text),
+                            "toxic": is_toxic(c_text),
+                            "type": "comment"
+                        })
+                        insights.append(c_analysis)
+                
+                fetched_posts += 1
+                time.sleep(REQUEST_DELAY)
 
-        
-        # Final Metrics
-        
+            fb_posts_url = data.get("paging", {}).get("next") if fetched_posts < max_posts else None
+
+        # 6. Final Calculations
         insight_metrics, recommendations = compute_insight_metrics(insights)
 
         return cors_json_response({
@@ -221,17 +243,17 @@ def analyze_facebook(request):
         })
 
     except Exception as e:
-        logger.error(f"SYSTEM CRASH: {e}", exc_info=True)
-        return cors_json_response(
-            {"error": "Internal Server Error", "details": str(e)},
-            status=500
-        )
+        logger.error(f"SYSTEM CRASH: {str(e)}")
+        return cors_json_response({
+            "error": "Internal Server Error",
+            "details": str(e)
+        }, status=500)
 
 @csrf_exempt
 def request_report(request):
     from .tasks import generate_report
 
-    logger.info("➡️ /insights/request-report CALLED")
+    logger.info("/insights/request-report CALLED")
 
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
