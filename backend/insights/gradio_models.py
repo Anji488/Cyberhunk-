@@ -10,9 +10,9 @@ _client = None
 # Thread pool for enforcing timeouts
 _executor = ThreadPoolExecutor(max_workers=1)
 
-# =========================
+
 # Emoji Sentiment
-# =========================
+
 
 POS_EMOJIS = {"😍", "🥰", "❤️", "😂", "😊", "👍", "🥹", "🤩", "🤣"}
 NEG_EMOJIS = {"😢", "💔", "😠", "😡", "😞", "😤", "🤥"}
@@ -33,9 +33,9 @@ def emoji_sentiment(text: str):
     return None
 
 
-# =========================
+
 # Gradio Client
-# =========================
+
 
 def get_gradio_client():
     global _client
@@ -45,9 +45,9 @@ def get_gradio_client():
     return _client
 
 
-# =========================
+
 # Internal call (NO timeout)
-# =========================
+
 
 def _predict_gradio(text: str):
     client = get_gradio_client()
@@ -57,9 +57,9 @@ def _predict_gradio(text: str):
     )
 
 
-# =========================
+
 # Public Safe API
-# =========================
+
 
 def analyze_text_gradio(text: str) -> dict:
     """
@@ -101,7 +101,7 @@ def analyze_text_gradio(text: str) -> dict:
             logger.warning("[GRADIO ERROR] Unexpected response type: %s", type(raw))
             return default_response
 
-        # -------- Sentiment --------
+        #  Sentiment 
         sentiment_raw = raw.get("sentiment")
         sentiment = SENTIMENT_MAP.get(sentiment_raw, "neutral")
 
@@ -109,15 +109,15 @@ def analyze_text_gradio(text: str) -> dict:
         if emoji_override:
             sentiment = emoji_override
 
-        # -------- Toxicity --------
+        #  Toxicity 
         toxicity_raw = raw.get("toxicity")
         toxic = TOXICITY_MAP.get(toxicity_raw, False)
 
-        # -------- Misinformation --------
+        #  Misinformation 
         misinfo_raw = raw.get("misinformation")
         misinformation = MISINFO_MAP.get(misinfo_raw, False)
 
-        # -------- Entities --------
+        #  Entities 
         entities = raw.get("entities", [])
         phones = raw.get("phones", [])
         emails = raw.get("emails", [])
