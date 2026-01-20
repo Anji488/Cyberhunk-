@@ -5,7 +5,7 @@ import * as htmlToImage from "html-to-image";
 import download from "downloadjs";
 import { motion } from "framer-motion";
 import InsightCard from "@/components/InsightCard";
-
+import ReactMarkdown from "react-markdown";
 const BACKEND_URL = "http://localhost:8000";
 
 export default function ReportsPage({ token }) {
@@ -271,23 +271,55 @@ export default function ReportsPage({ token }) {
                   </div>
                 </motion.div>
 
-                {selectedReport.recommendations?.length > 0 && (
+                {selectedReport.recommendations && (
                   <div>
                     <h3 className="text-2xl font-bold text-purple-600 mb-4">
                       Recommendations
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {selectedReport.recommendations.map((r, i) => (
-                        <div
-                          key={i}
-                          className="bg-white rounded-2xl p-4 shadow"
-                        >
-                          {r.text || r}
-                        </div>
-                      ))}
+
+                    <div className="prose prose-indigo max-w-none">
+                      <ReactMarkdown
+                        components={{
+                          h3: ({ children }) => (
+                            <motion.div
+                              initial={{ opacity: 0, y: 12 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.4, ease: "easeOut" }}
+                              className="mt-10 mb-4"
+                            >
+                              <h3 className="text-xl md:text-2xl font-bold text-gray-900">
+                                {children}
+                              </h3>
+
+                              <motion.div
+                                initial={{ scaleX: 0 }}
+                                animate={{ scaleX: 1 }}
+                                transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+                                className="block origin-left h-[3px] w-16 bg-indigo-400 rounded-full mt-2"
+                              />
+                            </motion.div>
+                          ),
+
+                          p: ({ children }) => (
+                            <motion.p
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.3, delay: 0.1 }}
+                              className="text-gray-700 leading-relaxed mb-4 text-base"
+                            >
+                              {children}
+                            </motion.p>
+                          ),
+
+                          hr: () => null,
+                        }}
+                      >
+                        {selectedReport.recommendations}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 )}
+
               </div>
 
               <div className="mt-6 flex justify-end gap-3">

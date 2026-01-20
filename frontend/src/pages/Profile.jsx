@@ -198,6 +198,10 @@ export default function ProfilePage() {
       y: { ticks: { color: "#374151" }, grid: { color: "#e5e7eb" } }
     }
   };
+const safeRecommendations =
+  typeof recommendations === "string" && recommendations.trim().length > 0
+    ? recommendations
+    : null;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -317,46 +321,49 @@ export default function ProfilePage() {
           <h3 className="text-2xl font-bold mb-4 text-indigo-400">
             Personalized Recommendations
           </h3>
-          <div className="prose prose-indigo max-w-none">
-              <ReactMarkdown
-                components={{
-                  h2: ({ children }) => (
-                    <motion.div
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, ease: "easeOut" }}
-                      className="mt-10 mb-4"
-                    >
-                      <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-                        {children}
-                      </h2>
-    
-                      <motion.div
-                        initial={{ scaleX: 0 }}
-                        animate={{ scaleX: 1 }}
-                        transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
-                        className="block origin-left h-[3px] w-16 bg-indigo-400 rounded-full mt-2"
-                      />
-                    </motion.div>
-                  ),
-    
-                  p: ({ children }) => (
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3, delay: 0.1 }}
-                      className="text-gray-700 leading-relaxed mb-4 text-base"
-                    >
-                      {children}
-                    </motion.p>
-                  ),
-    
-                  hr: () => null, 
-                }}
-              >
-                {recommendations}
-              </ReactMarkdown>
-            </div>
+          {safeRecommendations && (
+  <div className="prose prose-indigo max-w-none">
+    <ReactMarkdown
+      components={{
+        h2: ({ children }) => (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="mt-10 mb-4"
+          >
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+              {children}
+            </h2>
+
+            <motion.div
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+              className="block origin-left h-[3px] w-16 bg-indigo-400 rounded-full mt-2"
+            />
+          </motion.div>
+        ),
+
+        p: ({ children }) => (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+            className="text-gray-700 leading-relaxed mb-4 text-base"
+          >
+            {children}
+          </motion.p>
+        ),
+
+        hr: () => null,
+      }}
+    >
+      {safeRecommendations}
+    </ReactMarkdown>
+  </div>
+)}
+
         </div>
 
       </div>
