@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True)
 def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=None):
 
-    logger.info(f"📝 Creating report | report_id={report_id}")
+    logger.info(f"Creating report | report_id={report_id}")
 
     try:
         result = reports_collection.insert_one({
@@ -22,7 +22,7 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
             "created_at": datetime.utcnow()
         })
 
-        logger.info(f"✅ DB INSERT SUCCESS | _id={result.inserted_id}")
+        logger.info(f" DB INSERT SUCCESS | _id={result.inserted_id}")
 
         profile = fetch_profile(token)
         analysis = analyze_facebook_data(token, method, max_posts)
@@ -40,7 +40,7 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
             }}
         )
 
-        logger.info(f"✅ Report completed | report_id={report_id}")
+        logger.info(f" Report completed | report_id={report_id}")
 
     except Exception as e:
         logger.exception("Report generation failed")

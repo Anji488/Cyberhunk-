@@ -253,7 +253,7 @@ def analyze_facebook(request):
 def request_report(request):
     from .tasks import generate_report
 
-    logger.info("➡️ /insights/request-report CALLED")
+    logger.info("/insights/request-report CALLED")
 
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)

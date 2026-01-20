@@ -41,7 +41,7 @@ export default function ChartsPage() {
     );
   }
 
-  // --- Chart data ---
+  //  Chart data 
   const sentimentCounts = { positive: 0, negative: 0, neutral: 0 };
   const postsPerDay = {};
   const engagementPerWeek = [0, 0, 0, 0];
