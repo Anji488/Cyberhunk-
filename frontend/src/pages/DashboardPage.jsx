@@ -117,14 +117,7 @@ export default function DashboardPage() {
 
       <div>
         <h3 className="text-3xl font-bold mb-5 text-indigo-400">Personalized Recommendations</h3>
-        <motion.ul
-          initial="hidden"
-          animate="visible"
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
-          className="space-y-4"
-        >
-          <p>{recommendations}</p>
-        </motion.ul>
+        <p>{recommendations}</p>
       </div>
     </div>
   );
