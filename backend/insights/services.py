@@ -164,6 +164,7 @@ def compute_insight_metrics(insights: list):
     night_posts = 0
     location_mentions = 0
     respectful_count = 0
+    personal_info_mentions = 0
 
     
     # Sentiment & behavior (ALL)
@@ -179,7 +180,9 @@ def compute_insight_metrics(insights: list):
         if item.get("is_respectful"):
             respectful_count += 1
 
-    
+        if item.get("discloses_personal_info"):
+            personal_info_mentions += 1
+
     # Posting habits (POSTS ONLY)
     
     for post in posts:
@@ -231,9 +234,12 @@ def compute_insight_metrics(insights: list):
         f"Posting habits debug → total_posts={total_posts}, night_posts={night_posts}"
     )
 
+    privacy_risk_count = location_mentions + personal_info_mentions
+
     privacy_care_score = round(
-        100 - (location_mentions / total_items) * 100
+        max(0, 100 - (privacy_risk_count / total_items) * 100)
     )
+
 
     respectful_score = round(
         (respectful_count / total_items) * 100
