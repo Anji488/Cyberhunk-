@@ -4,7 +4,7 @@ import AnalyzeToken from "../components/AnalyzeToken";
 import * as htmlToImage from "html-to-image";
 import download from "downloadjs";
 
-const BACKEND_URL = "https://cyberhunk.onrender.com";
+const BACKEND_URL = "http://localhost:8000";
 const PAGE_SIZE = 5;
 
 export default function ReportsPage({ token }) {

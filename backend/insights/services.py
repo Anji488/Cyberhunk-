@@ -7,7 +7,7 @@ import json
 import requests
 
 import pytz
-from langdetect import detect, LangDetectException
+from langdetect import detect
 from emoji import demojize, EMOJI_DATA
 
 from openai import OpenAI
@@ -18,7 +18,6 @@ from insights.hf_models import map_sentiment_label
 print(os.getenv("HUGGINGFACE_TOKEN"))
 
 logger = logging.getLogger(__name__)
-
 LOCAL_TZ = pytz.timezone("Asia/Colombo")
 
 # =========================
@@ -240,7 +239,7 @@ def is_potential_misinformation(text: str) -> bool:
     except Exception as e:
         logger.error(f"[MISINFO ERROR] {e}")
 
-    return False
+    return False 
 
 
 # METRICS & RECOMMENDATIONS

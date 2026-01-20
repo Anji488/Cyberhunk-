@@ -94,7 +94,7 @@ def cors_json_response(data, status=200):
     """Ensures CORS headers are present even if the view catches an error."""
     response = JsonResponse(data, status=status)
     # Match your frontend Vercel URL
-    response["Access-Control-Allow-Origin"] = "https://cyberhunk.vercel.app"
+    response["Access-Control-Allow-Origin"] = "http://localhost:3000"
     response["Access-Control-Allow-Credentials"] = "true"
     response["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
