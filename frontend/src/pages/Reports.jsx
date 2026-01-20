@@ -1,107 +1,73 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import AnalyzeToken from "../components/AnalyzeToken";
 import * as htmlToImage from "html-to-image";
 import download from "downloadjs";
+import { motion } from "framer-motion";
+import InsightCard from "@/components/InsightCard";
 
-const BACKEND_URL = "http://localhost:8000";
-const PAGE_SIZE = 5;
+const BACKEND_URL = "https://cyberhunk.onrender.com";
 
 export default function ReportsPage({ token }) {
   const [profile, setProfile] = useState(null);
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const reportRef = useRef(null);
 
-  // Fetch reports
   useEffect(() => {
-    const fetchReports = async () => {
-      if (!profile?.id) {
-        setReports([]);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const res = await axios.get(`${BACKEND_URL}/insights/reports/`, {
-          params: { profile_id: String(profile.id) },
-          withCredentials: true,
-        });
-        setReports(res.data?.reports || []);
-      } catch {
-        setError("Failed to load reports.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchReports();
+    if (!profile?.id) return;
+    axios
+      .get(`${BACKEND_URL}/insights/reports/`, {
+        params: { profile_id: String(profile.id) },
+        withCredentials: true,
+      })
+      .then((res) => setReports(res.data?.reports || []));
   }, [profile?.id]);
 
-  // Filter + Sort
   const processedReports = useMemo(() => {
-    let list = [...reports];
-    if (statusFilter !== "all") {
-      list = list.filter((r) => (r.status || "Completed") === statusFilter);
-    }
+    const list = [...reports];
     list.sort((a, b) =>
       sortOrder === "newest"
         ? new Date(b.created_at) - new Date(a.created_at)
         : new Date(a.created_at) - new Date(b.created_at)
     );
     return list;
-  }, [reports, statusFilter, sortOrder]);
+  }, [reports, sortOrder]);
 
-  const totalPages = Math.ceil(processedReports.length / PAGE_SIZE);
+  const totalPages = Math.ceil(processedReports.length / pageSize);
   const paginatedReports = processedReports.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
-  const fetchReport = async (reportId) => {
-    setLoading(true);
-    try {
-      const res = await axios.get(
-        `${BACKEND_URL}/insights/reports/${reportId}/`,
-        { withCredentials: true }
-      );
-      setSelectedReport(res.data);
-      setIsModalOpen(true);
-    } finally {
-      setLoading(false);
-    }
+  const fetchReport = async (id) => {
+    const res = await axios.get(
+      `${BACKEND_URL}/insights/reports/${id}/`,
+      { withCredentials: true }
+    );
+    setSelectedReport(res.data);
+    setIsModalOpen(true);
   };
 
   const downloadReport = async () => {
-    if (!reportRef.current) return;
     const dataUrl = await htmlToImage.toPng(reportRef.current);
     download(dataUrl, `report_${selectedReport.report_id}.png`);
   };
 
   const shareReport = async () => {
-    if (!reportRef.current) return;
-
     const dataUrl = await htmlToImage.toPng(reportRef.current);
     const blob = await (await fetch(dataUrl)).blob();
     const file = new File([blob], "report.png", { type: blob.type });
-
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({
-        title: "Report",
-        text: "Check out this report!",
+        title: "Digital Behavior Report",
         files: [file],
       });
-    } else {
-      alert("Sharing not supported. Please download instead.");
     }
   };
 
@@ -110,8 +76,8 @@ export default function ReportsPage({ token }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 px-4 py-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-slate-50 px-4 py-8">
+      <div className="max-w-7xl mx-auto">
         {!profile && (
           <AnalyzeToken
             token={token}
@@ -119,89 +85,116 @@ export default function ReportsPage({ token }) {
           />
         )}
 
-        {/* Header + Filters */}
-        <div className="mt-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h2 className="text-2xl sm:text-3xl font-bold text-indigo-700">
-            Past Reports
-          </h2>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="rounded-xl border px-4 py-2 text-sm shadow-sm focus:ring-2 focus:ring-indigo-400"
-            >
-              <option value="all">All Status</option>
-              <option value="Completed">Completed</option>
-            </select>
+        <h1 className="text-3xl font-bold text-indigo-700 mb-6">
+          Result History
+        </h1>
+
+        <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
+          <div className="flex gap-3">
             <select
               value={sortOrder}
               onChange={(e) => {
                 setSortOrder(e.target.value);
                 setCurrentPage(1);
               }}
-              className="rounded-xl border px-4 py-2 text-sm shadow-sm focus:ring-2 focus:ring-indigo-400"
+              className="border rounded-lg px-4 py-2 text-sm"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
             </select>
+
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="border rounded-lg px-4 py-2 text-sm"
+            >
+              <option value={5}>5 / page</option>
+              <option value={10}>10 / page</option>
+              <option value={20}>20 / page</option>
+            </select>
           </div>
         </div>
 
-        {/* Report Cards */}
-        <div className="mt-6 space-y-4">
-          {paginatedReports.map((r) => (
-            <div
-              key={r.report_id}
-              className="bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition
-                         flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
-            >
-              <div>
-                <p className="font-semibold text-gray-800 truncate">
-                  {r.report_id}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {new Date(r.created_at).toLocaleString()}
-                </p>
-              </div>
+        <div className="overflow-x-auto bg-white rounded-2xl shadow">
+          <table className="min-w-full text-sm">
+            <thead className="bg-indigo-50 text-indigo-700">
+              <tr>
+                <th className="px-4 py-3 text-left">No</th>
+                <th className="px-4 py-3 text-left">Test Taken</th>
+                <th className="px-4 py-3 text-center">Happy Posts</th>
+                <th className="px-4 py-3 text-center">Good Posting Habits</th>
+                <th className="px-4 py-3 text-center">Privacy Care</th>
+                <th className="px-4 py-3 text-center">Being Respectful</th>
+                <th className="px-4 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
 
-              <div className="flex items-center gap-3">
-                <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-sm font-medium">
-                  {r.status || "Completed"}
-                </span>
-                <button
-                  onClick={() => fetchReport(r.report_id)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white
-                             px-5 py-2 rounded-xl text-sm font-semibold"
-                >
-                  View
-                </button>
-              </div>
-            </div>
-          ))}
+            <tbody>
+              {paginatedReports.map((r, i) => {
+                const metrics = Object.fromEntries(
+                  (r.insightMetrics || []).map((m) => [m.title, m.value])
+                );
+
+                return (
+                  <tr key={r.report_id} className="border-t hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      {(currentPage - 1) * pageSize + i + 1}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {new Date(r.created_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "2-digit",
+                        year: "numeric",
+                      })}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {metrics["Happy Posts"] ?? "—"}%
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {metrics["Good Posting Habits"] ?? "—"}%
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {metrics["Privacy Care"] ?? "—"}%
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {metrics["Being Respectful"] ?? "—"}%
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => fetchReport(r.report_id)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="mt-8 flex justify-center items-center gap-2 flex-wrap">
+          <div className="mt-6 flex justify-center gap-2">
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => p - 1)}
-              className="px-4 py-2 rounded-lg border disabled:opacity-40"
+              className="px-4 py-2 border rounded disabled:opacity-40"
             >
-              Previous
+              Prev
             </button>
 
             {[...Array(totalPages)].map((_, i) => (
               <button
                 key={i}
                 onClick={() => setCurrentPage(i + 1)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                className={`px-4 py-2 rounded ${
                   currentPage === i + 1
                     ? "bg-indigo-600 text-white"
-                    : "border hover:bg-slate-100"
+                    : "border"
                 }`}
               >
                 {i + 1}
@@ -211,21 +204,20 @@ export default function ReportsPage({ token }) {
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage((p) => p + 1)}
-              className="px-4 py-2 rounded-lg border disabled:opacity-40"
+              className="px-4 py-2 border rounded disabled:opacity-40"
             >
               Next
             </button>
           </div>
         )}
 
-        {/* Modal */}
         {isModalOpen && selectedReport && (
           <div
             id="modal-backdrop"
             onClick={closeOnBackdrop}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
-            <div className="bg-white w-full max-w-3xl rounded-3xl shadow-xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto relative">
+            <div className="bg-white w-full max-w-5xl rounded-3xl shadow-xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto relative">
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="absolute top-4 right-4 text-xl text-gray-500"
@@ -233,83 +225,81 @@ export default function ReportsPage({ token }) {
                 ×
               </button>
 
-              {/* Export Area */}
               <div
                 ref={reportRef}
-                className="space-y-6 p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl"
+                className="space-y-8 p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl"
               >
-                {/* Profile */}
                 {selectedReport.profile && (
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-2xl shadow">
                     <img
                       src={selectedReport.profile.picture?.data?.url}
-                      alt="Profile"
-                      className="w-20 h-20 rounded-full border-4 border-indigo-300 shadow"
+                      className="w-20 h-20 rounded-full border-4 border-indigo-300"
                     />
-                    <div className="text-center sm:text-left">
+                    <div>
                       <p className="font-bold text-xl">
                         {selectedReport.profile.name}
                       </p>
                       <p className="text-sm text-gray-600">
-                        {selectedReport.profile.birthday || "N/A"}
+                        {selectedReport.profile.gender || "N/A"}
                       </p>
                       <p className="text-sm text-gray-600">
-                        {selectedReport.profile.gender || "N/A"}
+                        {selectedReport.profile.birthday || "N/A"}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {/* Metrics */}
-                {selectedReport.insightMetrics?.length > 0 && (
-                  <div>
-                    <h3 className="font-bold text-lg text-indigo-600 mb-2">
-                      Insight Metrics
-                    </h3>
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {selectedReport.insightMetrics.map((m, i) => (
-                        <li
-                          key={i}
-                          className="bg-white rounded-xl p-3 shadow text-gray-700 font-semibold"
-                        >
-                          {m.title} — {m.value}%
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <h3 className="text-2xl font-bold text-indigo-600 mb-4">
+                    Insight Metrics
+                  </h3>
 
-                {/* Recommendations */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {selectedReport.insightMetrics.map((metric, idx) => (
+                      <InsightCard
+                        key={idx}
+                        title={metric.title}
+                        value={`${metric.value}%`}
+                        rating={metric.rating}
+                        className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-5"
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+
                 {selectedReport.recommendations?.length > 0 && (
                   <div>
-                    <h3 className="font-bold text-lg text-purple-600 mb-2">
+                    <h3 className="text-2xl font-bold text-purple-600 mb-4">
                       Recommendations
                     </h3>
-                    <ul className="space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {selectedReport.recommendations.map((r, i) => (
-                        <li
+                        <div
                           key={i}
-                          className="bg-white rounded-xl p-3 shadow text-gray-700"
+                          className="bg-white rounded-2xl p-4 shadow"
                         >
                           {r.text || r}
-                        </li>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Buttons */}
-              <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3">
+              <div className="mt-6 flex justify-end gap-3">
                 <button
                   onClick={shareReport}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl font-semibold"
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl"
                 >
                   Share
                 </button>
                 <button
                   onClick={downloadReport}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl font-semibold"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl"
                 >
                   Download
                 </button>

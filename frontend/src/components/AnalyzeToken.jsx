@@ -58,7 +58,7 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
         console.log("✅ Raw backend response:", res.data);
 
         if (!res.data || typeof res.data !== "object" || (typeof res.data === 'string' && res.data.includes("ngrok"))) {
-          console.error("❌ Response is not JSON (likely ngrok interstitial or server error):", res.data);
+          console.error("Response is not JSON (likely ngrok interstitial or server error):", res.data);
           throw new Error("NGROK_ISSUE"); 
         }
 
@@ -101,10 +101,10 @@ export default function AnalyzeToken({ token: propToken, method = "ml", onInsigh
           );
           console.log("✅ Report generation triggered");
         } catch (e) {
-          console.error("❌ Failed to trigger report generation", e);
+          console.error("Failed to trigger report generation", e);
         }
       } catch (err) {
-        console.error("❌ Token analysis failed:", err);
+        console.error("Token analysis failed:", err);
         const errorMessage = err.response 
           ? `Server Error: ${err.response.status}`
           : "Network/CORS Error: The backend is likely waking up or blocking the request.";

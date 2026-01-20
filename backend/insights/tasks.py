@@ -43,7 +43,7 @@ def generate_report(self, report_id, token, method="ml", max_posts=5, user_id=No
         logger.info(f"✅ Report completed | report_id={report_id}")
 
     except Exception as e:
-        logger.exception("❌ Report generation failed")
+        logger.exception("Report generation failed")
 
         reports_collection.update_one(
             {"report_id": report_id},

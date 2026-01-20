@@ -117,27 +117,7 @@ export default function DashboardPage() {
 
       <div>
         <h3 className="text-3xl font-bold mb-5 text-indigo-400">Personalized Recommendations</h3>
-        <motion.ul
-          initial="hidden"
-          animate="visible"
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
-          className="space-y-4"
-        >
-          {recommendations.map((rec, idx) => {
-            const Icon = ICONS[idx % ICONS.length];
-            return (
-              <motion.li
-                key={idx}
-                className="flex items-center space-x-3 bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-4 shadow-lg transition transform "
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-              >
-                <Icon className="w-6 h-6 text-pink-400 flex-shrink-0" />
-                <span className="text-gray-700 font-medium">{rec.text}</span>
-              </motion.li>
-            );
-          })}
-        </motion.ul>
+        <p>{recommendations}</p>
       </div>
     </div>
   );
