@@ -34,15 +34,12 @@ def emoji_sentiment(text: str):
 def get_gradio_client():
     global _client
     if _client is None:
-        _client = Client("Anjanie/cyberhunk")  
+        _client = Client(
+            "Anjanie/cyberhunk",
+            timeout=20 )  
         logger.info("Gradio client initialized WITHOUT auth (public Space).")
     return _client
 
-# Cached Gradio Analysis
-
-@lru_cache(maxsize=2048)
-def analyze_text_gradio_cached(text: str) -> dict:
-    return analyze_text_gradio(text)
 
 def analyze_text_gradio(text: str) -> dict:
     """
@@ -64,7 +61,7 @@ def analyze_text_gradio(text: str) -> dict:
             logger.warning("[GRADIO ERROR] Client not initialized.")
             return {}
 
-        raw = client.predict(text=text, api_name="/analyze_text")
+        raw = client.predict(text=text[:2000], api_name="/analyze_text")
         if not isinstance(raw, dict):
             logger.warning(f"[GRADIO ERROR] Unexpected response type: {type(raw)}")
             return {}
@@ -109,5 +106,14 @@ def analyze_text_gradio(text: str) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"[GRADIO ERROR] {e}")
-        return {}
+        logger.error(f"[GRADIO ERROR] {e}", exc_info=True)
+        return {
+            "label": "neutral",
+            "toxic": False,
+            "misinformation": False,
+            "entities": [],
+            "phones": [],
+            "emails": [],
+            "error": "ml_unavailable"
+        }
+
