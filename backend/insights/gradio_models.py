@@ -1,31 +1,27 @@
-from gradio_client import Client
+# backend/insights/gradio_models.py
+
+from gradio_client import Client, ClientException, NetworkError
+import os
 import logging
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from functools import lru_cache
 
 from insights.label_maps import SENTIMENT_MAP, TOXICITY_MAP, MISINFO_MAP
 
 logger = logging.getLogger(__name__)
 _client = None
 
-# Thread pool for enforcing timeouts
-_executor = ThreadPoolExecutor(max_workers=1)
 
-# =========================
 # Emoji Sentiment
-# =========================
 
-POS_EMOJIS = {"😍", "🥰", "❤️", "😂", "😊", "👍", "🥹", "🤩", "🤣"}
+POS_EMOJIS = {"😍", "🥰", "❤️", "😂", "😊", "👍", "🥹", "🤩", "🤣", "😁"}
 NEG_EMOJIS = {"😢", "💔", "😠", "😡", "😞", "😤", "🤥"}
-
 
 def emoji_sentiment(text: str):
     text = text.strip()
     if not text:
         return None
-
     pos_count = sum(text.count(e) for e in POS_EMOJIS)
     neg_count = sum(text.count(e) for e in NEG_EMOJIS)
-
     if pos_count > neg_count:
         return "positive"
     elif neg_count > pos_count:
@@ -33,91 +29,57 @@ def emoji_sentiment(text: str):
     return None
 
 
-# =========================
 # Gradio Client
-# =========================
 
 def get_gradio_client():
     global _client
     if _client is None:
-        _client = Client("Anjanie/cyberhunk")
-        logger.info("Gradio client initialized (public HF Space)")
+        _client = Client("Anjanie/cyberhunk")  
+        logger.info("Gradio client initialized WITHOUT auth (public Space).")
     return _client
 
+# Cached Gradio Analysis
 
-# =========================
-# Internal call (NO timeout)
-# =========================
-
-def _predict_gradio(text: str):
-    client = get_gradio_client()
-    return client.predict(
-        text=text,
-        api_name="/analyze_text"
-    )
-
-
-# =========================
-# Public Safe API
-# =========================
+@lru_cache(maxsize=2048)
+def analyze_text_gradio_cached(text: str) -> dict:
+    return analyze_text_gradio(text)
 
 def analyze_text_gradio(text: str) -> dict:
-    """
-    Safe Gradio inference with:
-    - Hard timeout
-    - Input size limit
-    - Guaranteed response shape
-    """
-
-    default_response = {
-        "label": "neutral",
-        "toxic": False,
-        "misinformation": False,
-        "entities": [],
-        "phones": [],
-        "emails": [],
-    }
-
     if not text or not text.strip():
-        return default_response
-
-    # HARD input limit
-    text = text.strip()[:2000]
+        return {
+            "label": "neutral",
+            "toxic": False,
+            "misinformation": False,
+            "entities": [], "phones": [], "emails": []
+        }
 
     try:
-        future = _executor.submit(_predict_gradio, text)
+        client = get_gradio_client()
+        if not client:
+            logger.warning("[GRADIO ERROR] Client not initialized.")
+            return {}
 
-        try:
-            raw = future.result(timeout=20)  # ⬅️ HARD TIMEOUT
-        except TimeoutError:
-            logger.error("[GRADIO TIMEOUT] Inference exceeded 20s")
-            future.cancel()
-            return {
-                **default_response,
-                "error": "ml_timeout"
-            }
-
+        raw = client.predict(text=text, api_name="/analyze_text", timeout=30)
         if not isinstance(raw, dict):
-            logger.warning("[GRADIO ERROR] Unexpected response type: %s", type(raw))
-            return default_response
+            logger.warning(f"[GRADIO ERROR] Unexpected response type: {type(raw)}")
+            return {}
 
-        # -------- Sentiment --------
+        # Sentiment
         sentiment_raw = raw.get("sentiment")
         sentiment = SENTIMENT_MAP.get(sentiment_raw, "neutral")
-
         emoji_override = emoji_sentiment(text)
         if emoji_override:
             sentiment = emoji_override
 
-        # -------- Toxicity --------
+        # Toxicity
         toxicity_raw = raw.get("toxicity")
         toxic = TOXICITY_MAP.get(toxicity_raw, False)
 
-        # -------- Misinformation --------
+        # Misinformation
         misinfo_raw = raw.get("misinformation")
         misinformation = MISINFO_MAP.get(misinfo_raw, False)
 
-        # -------- Entities --------
+        # Entities & Personal Info
         entities = raw.get("entities", [])
         phones = raw.get("phones", [])
         emails = raw.get("emails", [])
@@ -131,9 +93,9 @@ def analyze_text_gradio(text: str) -> dict:
             "emails": emails,
         }
 
+    except (ClientException, NetworkError, TimeoutError) as e:
+        logger.error(f"[GRADIO TIMEOUT] {e}")
+        return {"label": "neutral", "toxic": False, "misinformation": False, "entities": [], "phones": [], "emails": []}
     except Exception as e:
-        logger.error("[GRADIO ERROR] %s", e, exc_info=True)
-        return {
-            **default_response,
-            "error": "ml_failure"
-        }
+        logger.error(f"[GRADIO ERROR] {e}")
+        return {"label": "neutral", "toxic": False, "misinformation": False, "entities": [], "phones": [], "emails": []}
